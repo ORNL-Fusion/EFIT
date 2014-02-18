@@ -152,7 +152,7 @@ class equilParams:
 		# (R,Z) and B-fields for all flux surfaces given by 1-D normalized poloidal flux array psiN1D
 		def get_allFluxSur(self):
 			FluxSurList = []
-			R,Z = self.__get_RZ__(self.theta, self.PSIdict['psiN1D'])
+			R,Z = self.__get_RZ__(self.theta, self.PSIdict['psiN1D'], quiet = True)
 				
 			for i in enumerate(self.PSIdict['psiN1D']):
 				psiNVal = i[1]
@@ -398,7 +398,7 @@ class equilParams:
 		# --- R, Z = get_RZ(theta, psi, g) ---
 		# returns 2D-arrays R and Z for all (theta, psi) points
 		# theta and psi are 1D base arrays of a regular grid.
-		def __get_RZ__(self, theta, psi):
+		def __get_RZ__(self, theta, psi, quiet = False):
 			npsi = psi.size
 			nt = theta.size
 			R = np.zeros((npsi, nt))
@@ -481,8 +481,9 @@ class equilParams:
 				# no convergence check
 				N += 1
 				if(N > max_it): 
-					print 'Warning, iterate_RZ: bad convergence, check if error is acceptable'
-					print 'Iteration: ', N, ', Error: ', ratio
+					if not quiet:
+						print 'Warning, iterate_RZ: bad convergence, check if error is acceptable'
+						print 'Iteration: ', N, ', Error: ', ratio
 					break
 		
 			return R, Z

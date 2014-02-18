@@ -567,8 +567,14 @@ class interpPeriodic:
 
         ym = self._y[im]
         yp = self._y[ip]
+        
+        from warnings import filterwarnings
+        filterwarnings('error')
+        try:
+            slope = (yp - ym) / (xp - xm)
+        except:
+            slope = 0.0
 
-        slope = (yp - ym) / (xp - xm)
         if np.isnan(slope):
             slope = np.array(0.0)
         if np.isinf(slope):
