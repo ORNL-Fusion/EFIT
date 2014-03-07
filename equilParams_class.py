@@ -167,7 +167,7 @@ class equilParams:
 				Bsqrd = fluxSur.Bsqav()
 
 				FluxSur = {'Rs':R_hold, 'Zs':Z_hold, 'Bp':Bp_hold, 'Bt':fluxSur._Bt, 
-						   'Bmod':fluxSur._B, 'Bsqrd':Bsqrd, 'fpol_psiN':fpol_psiN}
+						   'Bmod':fluxSur._B, 'Bsqrd':Bsqrd, 'fpol_psiN':fpol_psiN, 'FS':fluxSur}
 					
 				FluxSurList.append(FluxSur)
 
@@ -278,8 +278,8 @@ class equilParams:
 
 
 		# --------------------------------------------------------------------------------
-		# 1-D current density profile
-		def cur_density(self, FluxSurfList = None):
+		# 1-D parallel current density profile
+		def cur_density(self, FluxSurfList = None, get_jtor = True):
 			import scipy.constants
 			mu0 = scipy.constants.mu_0
 			
@@ -291,17 +291,70 @@ class equilParams:
 			if(FluxSurfList == None):
 				FluxSurfList = self.get_allFluxSur()
 
-			for i in enumerate(PSIdict['psiN1D']):
-				Bsqrd_prof[i[0]] = FluxSurfList[i[0]]['Bsqrd']
-			
+			for i, psi in enumerate(PSIdict['psiN1D']):
+				Bsqrd_prof[i] = FluxSurfList[i]['Bsqrd']
+											
 			# parallel current calc
-			# jpar = J (dot) B = fprime*B^2/mu0 + pprime*fpol/B0
+			# <jpar> = <(J (dot) B)>/B0 = (fprime*<B^2>/mu0 + pprime*fpol)/B0
 			jpar1D = (PROFdict['fpfunc'](PSIdict['psiN1D'])*Bsqrd_prof/mu0 +PROFdict['ppfunc'](PSIdict['psiN1D'])*PROFdict['ffunc'](PSIdict['psiN1D']))/self.bcentr/1.e6
 	
-			#jtor [A/m**2] = R*pprime +ffprime/R/mu0
-			jtor1D = np.abs(self.Rsminor*PROFdict['ppfunc'](PSIdict['psiN1D']) +(PROFdict['ffpfunc'](PSIdict['psiN1D'])/self.Rsminor/mu0))/1.e6
+			# <jtor> = <R*pprime + ffprime/R/mu0>
+			# jtor1D = np.abs(self.Rsminor*PROFdict['ppfunc'](PSIdict['psiN1D']) +(PROFdict['ffpfunc'](PSIdict['psiN1D'])/self.Rsminor/mu0))/1.e6
+			if get_jtor:
+				jtor1D = self. jtor_profile(FluxSurfList)
+			else: 
+				jtor1D = 0
+			
+			return {'jpar':jpar1D, 'jtor':jtor1D, 'Bsqrd':Bsqrd_prof}
+			
+		
+		# --------------------------------------------------------------------------------
+		# 1-D toroidal current density profile
+		def jtor_profile(self, FluxSurfList = None):
+			import scipy.constants
+			mu0 = scipy.constants.mu_0
+			
+			PSIdict = self.PSIdict
+			PROFdict = self.PROFdict
 
-			return {'jpar':jpar1D,'jtor':jtor1D}
+			jtor1D = np.ones(self.nw)
+			
+			if(FluxSurfList == None):
+				FluxSurfList = self.get_allFluxSur()
+
+			# get flux surface average
+			for i, psi in enumerate(PSIdict['psiN1D']):
+				jtorSurf = PROFdict['ppfunc'](psi)*FluxSurfList[i]['Rs'] + PROFdict['ffpfunc'](psi)/FluxSurfList[i]['Rs']/mu0
+				f_jtorSurf = eq.interpPeriodic(self.theta, jtorSurf, copy = False)
+				jtor1D[i] = FluxSurfList[i]['FS'].average(f_jtorSurf)
+
+			# <jtor> = <R*pprime + ffprime/R/mu0>
+			jtor1D = np.abs(jtor1D)/1.e6
+			return jtor1D
+
+			
+		# --------------------------------------------------------------------------------
+		# Flux surface enclosed 2D-Volume (Area inside surface) and derivative (psi)
+		def volume2D(self, FluxSurfList = None):
+			V = np.zeros(self.nw)
+			psi = self.PSIdict['psiN1D']
+			
+			if(FluxSurfList == None):
+				FluxSurfList = self.get_allFluxSur()
+				
+			for i in xrange(1, self.nw):
+				rsq = (FluxSurfList[i]['Rs'] - self.rmaxis)**2 + (FluxSurfList[i]['Zs'] - self.zmaxis)**2
+				V[i] = 0.5 * integ.simps(rsq, self.theta)
+			
+			# dV/dpsi
+			dV = np.zeros(self.nw)
+			for i in xrange(1, self.nw - 1):
+				dV[i] = (V[i+1] - V[i-1]) / (psi[i+1] - psi[i-1])
+	
+			dV[0] = (-V[2] + 4*V[1] - 3*V[0]) / (psi[2] - psi[0])
+			dV[-1] = (V[-3] - 4*V[-2] + 3*V[-1]) / (psi[-1] - psi[-3])
+
+			return {'V':V, 'Vprime':dV}
 			
 			
 		# --------------------------------------------------------------------------------
@@ -350,6 +403,26 @@ class equilParams:
 			paramDICT['psitorN1D'] = self.getTorPsi(qprof1D)
 
 			return paramDICT
+		
+		
+		# --------------------------------------------------------------------------------
+		# returns arrays R and Z of N points along psi = const. surface
+		def flux_surface(self, psi0, N, theta = None):
+			if(theta == None): 
+				theta = np.linspace(0,2*np.pi,N + 1)[0:-1]
+			else :
+				N = len(theta)
+				
+			r = np.zeros(theta.shape)
+	
+			for i in xrange(N): 
+				r[i] = self.__bisec__(psi0, theta[i])
+	
+			R = r*np.cos(theta) + self.rmaxis
+			Z = r*np.sin(theta) + self.zmaxis
+	
+			return R, Z
+
 
 		# --------------------------------------------------------------------------------
 		# --------------------------------------------------------------------------------
@@ -395,7 +468,8 @@ class equilParams:
 					break
 			return Rneu,Zneu
 			
-		# --- R, Z = get_RZ(theta, psi, g) ---
+			
+		# --------------------------------------------------------------------------------
 		# returns 2D-arrays R and Z for all (theta, psi) points
 		# theta and psi are 1D base arrays of a regular grid.
 		def __get_RZ__(self, theta, psi, quiet = False):
@@ -488,6 +562,9 @@ class equilParams:
 		
 			return R, Z
 
+
+		# --------------------------------------------------------------------------------
+		# get poloidal angle from (R,Z) coordinates
 		def __get_theta__(self, R, Z):
 			Rm = R - self.rmaxis # R relative to magnetic axis
 			Zm = Z - self.zmaxis # Z relative to magnetic axis
@@ -506,6 +583,7 @@ class equilParams:
 			return theta;
 	
 	
+		# --------------------------------------------------------------------------------
 		# get minor radius from (R,Z) coordinates
 		def __get_r__(self, R, Z):
 			Rm = R - self.rmaxis # R relative to magnetic axis
@@ -514,3 +592,35 @@ class equilParams:
 			return np.sqrt(Rm*Rm + Zm*Zm);
 
 
+		# --------------------------------------------------------------------------------
+		# get f(r) = psi(R(theta,r),Z(theta,r))-psi0 with theta = const.
+		def __funct__(self, r, theta, psi0):
+			R = r*np.cos(theta) + self.rmaxis
+			Z = r*np.sin(theta) + self.zmaxis
+			psi = self.psiFunc.ev(Z, R)	
+			f = psi - psi0
+			return f
+
+
+		# --------------------------------------------------------------------------------
+		# get r for theta = const. and psi = psi0
+		def __bisec__(self, psi0, theta, a = 0, b = 1.5):
+			eps = 1e-14
+	
+			x = a
+			f = self.__funct__(x, theta, psi0)
+	
+			if(f > 0):
+				xo = a
+				xu = b
+			else:
+				xo = b
+				xu = a
+	
+			while(abs(xo-xu) > eps):
+				x = (xo + xu)/2.0
+				f = self.__funct__(x, theta, psi0)
+				if(f > 0): xo = x
+				else: xu = x
+	
+			return x
