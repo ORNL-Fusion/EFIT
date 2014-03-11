@@ -73,10 +73,10 @@ class equilParams:
 		# --------------------------------------------------------------------------------
 		# 1-D and 2-D (R,Z) grid
 		def RZ_params(self):
-			dR = (self.Rmax - self.Rmin)/np.float64(self.nw - 1)
-			Rs1D = np.arange(self.Rmin, self.Rmax*(1.+1.e-10), dR)
-			dZ = (self.Zmax - self.Zmin)/np.float64(self.nh - 1)
-			Zs1D = np.arange(self.Zmin,self.Zmax*(1.+1.e-10), dZ)
+			dR = (self.Rmax - self.Rmin)/(self.nw - 1)
+			Rs1D = np.linspace(self.Rmin, self.Rmax, self.nw)
+			dZ = (self.Zmax - self.Zmin)/(self.nh - 1)
+			Zs1D = np.linspace(self.Zmin, self.Zmax, self.nh)
 			Rs2D,Zs2D = np.meshgrid(Rs1D,Zs1D)
 
 			return {'Rs1D':Rs1D,'dR':dR,'Zs1D':Zs1D,'dZ':dZ,'Rs2D':Rs2D,'Zs2D':Zs2D}
@@ -84,6 +84,9 @@ class equilParams:
 
 		# --------------------------------------------------------------------------------
 		# 1-D and 2-D poloidal flux, normalized and regular
+		# compared to the integral definition of psipol (psipol = 2pi integral_Raxis^Rsurf(Bpol * R * dR))
+		# regular is shifted by self.siAxis and missing the factor 2*pi !!!
+		# so: psipol = 2pi * (self.siBry-self.siAxis) * psiN1D
 		def getPsi(self):
 			g_psi2D = self.data.get('psirz')
 			RZdict = self.RZdict
@@ -103,13 +106,12 @@ class equilParams:
 			if(qprof1D == None):
 				qprof1D = self.PROFdict['qfunc'](self.PSIdict['psiN1D'])
 			
-			pn = np.arange(self.nw)/float((self.nw - 1))
-			dpsi = (pn[1] - pn[0])*(self.siBry - self.siAxis)
-			hold = np.cumsum(0.5*(qprof1D[0:self.nw-1] + qprof1D[1:self.nw])*dpsi)
-			psitor = np.concatenate((np.array([0.]), hold))
-			psitorN1D = (psitor - psitor[0])/(psitor[self.nw-1] - psitor[0])
+			dpsi = (self.siBry - self.siAxis)/(self.nw - 1) * 2*np.pi
+			hold = integ.cumtrapz(qprof1D, dx = dpsi) * np.sign(self.data.get('bcentr'))
+			psitor = np.append(0, hold)
+			psitorN1D = (psitor - psitor[0])/(psitor[-1] - psitor[0])
 			
-			return psitorN1D
+			return {'psitorN1D':psitorN1D, 'psitor1D':psitor}
 
 
 		# --------------------------------------------------------------------------------
@@ -355,7 +357,7 @@ class equilParams:
 			dV[-1] = (V[-3] - 4*V[-2] + 3*V[-1]) / (psi[-1] - psi[-3])
 
 			return {'V':V, 'Vprime':dV}
-			
+						
 			
 		# --------------------------------------------------------------------------------
 		# compute and return all of the above			
@@ -400,7 +402,7 @@ class equilParams:
 			paramDICT['btor1D'] = btor1D
 
 			# toroidal flux
-			paramDICT['psitorN1D'] = self.getTorPsi(qprof1D)
+			paramDICT['psitorN1D'] = self.getTorPsi(qprof1D)['psitorN1D']
 
 			return paramDICT
 		
