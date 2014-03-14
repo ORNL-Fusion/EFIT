@@ -4,7 +4,8 @@ import scipy.interpolate as interp
 
 import EFIT.geqdsk as gdsk
 import EFIT.equilibrium as eq
-reload(eq)
+from Misc.deriv import deriv
+#reload(eq)
 
 class equilParams:
 		
@@ -40,14 +41,24 @@ class equilParams:
 			self.PSIdict = self.getPsi()
 			
 			#---- more Variables ----
-			self.Bp_Z, self.Bp_R = np.gradient(-self.PSIdict['psi2D'], self.RZdict['dZ'], self.RZdict['dR'])
-			self.Bp_2D = np.sqrt(self.Bp_R**2 + self.Bp_Z**2)/self.RZdict['Rs2D']
+			self.dpsidZ, self.dpsidR = np.gradient(self.PSIdict['psi2D'], self.RZdict['dZ'], self.RZdict['dR'])
+			self.B_R = self.dpsidZ / self.RZdict['Rs2D']
+			self.B_Z = -self.dpsidR / self.RZdict['Rs2D']
+			self.Bp_2D = np.sqrt(self.B_R**2 + self.B_Z**2)
 			self.theta = np.linspace(0.0, 2.*np.pi, self.thetapnts)
+			
+			psiN2D = self.PSIdict['psiN_2D'].flatten()
+			idx = np.where(psiN2D <= 1)[0]	
+			Fpol2D = np.ones(psiN2D.shape) * self.data.get('bcentr') * self.data.get('rcentr')
+			Fpol2D[idx] = self.PROFdict['ffunc'](psiN2D[idx])
+			Fpol2D = Fpol2D.reshape(self.PSIdict['psiN_2D'].shape)
+			self.Bt_2D = Fpol2D / self.RZdict['Rs2D']
 
 			#---- more Functions ----
-			self.psiFunc = interp.RectBivariateSpline(self.RZdict['Zs1D'], self.RZdict['Rs1D'], self.PSIdict['psiN_2D'], kx=1, ky=1)
-			self.BpFunc = interp.RectBivariateSpline(self.RZdict['Zs1D'], self.RZdict['Rs1D'], self.Bp_2D, kx=1, ky=1)
-
+			self.psiFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'], self.PSIdict['psiN_2D'].T)
+			self.BpFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'], self.Bp_2D.T)
+			self.BtFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'], self.Bt_2D.T)
+			
 
 		# --------------------------------------------------------------------------------
 		# Interpolation function handles for all 1-D fields in the g-file
@@ -86,28 +97,23 @@ class equilParams:
 		# 1-D and 2-D poloidal flux, normalized and regular
 		# compared to the integral definition of psipol (psipol = 2pi integral_Raxis^Rsurf(Bpol * R * dR))
 		# regular is shifted by self.siAxis and missing the factor 2*pi !!!
-		# so: psipol = 2pi * (self.siBry-self.siAxis) * psiN1D
+		# so: psipol = psi1D = 2pi * (self.siBry-self.siAxis) * psiN1D
 		def getPsi(self):
-			g_psi2D = self.data.get('psirz')
-			RZdict = self.RZdict
-			psiN1D = np.linspace(0.0,1.0,self.nw)
-			gRs,gZs = np.meshgrid(np.linspace(self.Rmin,self.Rmax,g_psi2D.shape[1]),np.linspace(self.Zmin,self.Zmax,g_psi2D.shape[0]))
-			psi2D = interp.griddata((gRs.flatten(0),gZs.flatten(0)),g_psi2D.flatten(0),(RZdict['Rs1D'][:,None],RZdict['Zs1D'][None,:]),method='cubic',fill_value=0.0)
-			psi2D = psi2D.T
-			psiN_2D = (psi2D - self.siAxis)/(self.siBry-self.siAxis)
-			psiN_2D[np.where(psiN_2D > 1.2)] = 1.2
+			psiN1D = np.linspace(0.0 ,1.0, self.nw)
+			psi1D = 2*np.pi * (self.siBry - self.siAxis) * psiN1D
+			psi2D = self.data.get('psirz')
+			psiN_2D = (psi2D - self.siAxis) / (self.siBry - self.siAxis)
+			# psiN_2D[np.where(psiN_2D > 1.2)] = 1.2
 
-			return {'psi2D':psi2D,'psiN1D':psiN1D,'psiN_2D':psiN_2D}
+			return {'psi2D':psi2D,'psiN_2D':psiN_2D,'psi1D':psi1D,'psiN1D':psiN1D}
 
 
 		# --------------------------------------------------------------------------------
-		# 1-D normalized toroidal flux (from Canik's g3d.pro)
-		def getTorPsi(self, qprof1D = None):
-			if(qprof1D == None):
-				qprof1D = self.PROFdict['qfunc'](self.PSIdict['psiN1D'])
-			
+		# 1-D normalized toroidal flux
+		# dpsitor/dpsipol = q  ->  psitor = integral(q(psipol) * dpsipol)
+		def getTorPsi(self):
 			dpsi = (self.siBry - self.siAxis)/(self.nw - 1) * 2*np.pi
-			hold = integ.cumtrapz(qprof1D, dx = dpsi) * np.sign(self.data.get('bcentr'))
+			hold = integ.cumtrapz(self.PROFdict['q_prof'], dx = dpsi) * np.sign(self.data.get('bcentr'))
 			psitor = np.append(0, hold)
 			psitorN1D = (psitor - psitor[0])/(psitor[-1] - psitor[0])
 			
@@ -128,7 +134,7 @@ class equilParams:
 				R_hold[thet[0]] = Rneu
 				Z_hold[thet[0]] = Zneu
 
-			Bp_hold = self.BpFunc.ev(Z_hold, R_hold)
+			Bp_hold = self.BpFunc.ev(R_hold, Z_hold)
 			fpol_psiN = self.PROFdict['ffunc'](psiNVal)*np.ones(np.size(Bp_hold))
 			fluxSur = eq.FluxSurface(fpol_psiN, R_hold, Z_hold, Bp_hold, self.theta)
 			Bsqrd = fluxSur.Bsqav()
@@ -163,7 +169,7 @@ class equilParams:
 				R_hold = R[i[0],:]
 				Z_hold = Z[i[0],:]
 				
-				Bp_hold = self.BpFunc.ev(Z_hold, R_hold)
+				Bp_hold = self.BpFunc.ev(R_hold, Z_hold)
 				fpol_psiN = self.PROFdict['ffunc'](psiNVal)*np.ones(np.size(Bp_hold))
 				fluxSur = eq.FluxSurface(fpol_psiN, R_hold, Z_hold, Bp_hold, self.theta)
 				Bsqrd = fluxSur.Bsqav()
@@ -180,61 +186,48 @@ class equilParams:
 		# B-fields and its derivatives in 2-D poloidal plane given by (R,Z) grid
 		def getBs_2D(self, FluxSurfList = None):
 			RZdict = self.RZdict
-			dBp_dZ,_ = np.gradient(self.Bp_Z, RZdict['dZ'], RZdict['dR'])
-			dpsi_dRdZ,dBp_dR = np.gradient(self.Bp_R, RZdict['dZ'], RZdict['dR'])
+			d2psi_dZ2, _ = np.gradient(self.dpsidZ, RZdict['dZ'], RZdict['dR'])
+			d2psi_dRdZ, d2psi_dR2 = np.gradient(self.dpsidR, RZdict['dZ'], RZdict['dR'])
 	
-			Bsqrd = np.ones(self.nw)
-			dBpdR_hold = np.ones(self.thetapnts)
-			dBpdZ_hold = np.ones(self.thetapnts)
-			dpsidRdZ_hold = np.ones(self.thetapnts)
-			Bp_R_hold = np.ones(self.thetapnts)
-			Bp_Z_hold = np.ones(self.thetapnts)
-			
-			# np.size(PSIdict['psiN1D']) == self.nw
-			Rs_hold2D = np.ones((self.nw,self.thetapnts))
-			Zs_hold2D = np.ones((self.nw,self.thetapnts))
-			Btot_hold2D = np.ones((self.nw,self.thetapnts))
-			Bp_hold2D = np.ones((self.nw,self.thetapnts))
-			Bt_hold2D = np.ones((self.nw,self.thetapnts))
-			Bp_R_hold2D = np.ones((self.nw,self.thetapnts))
-			Bp_Z_hold2D = np.ones((self.nw,self.thetapnts))
-			dBpdR_hold2D = np.ones((self.nw,self.thetapnts))
-			dBpdZ_hold2D = np.ones((self.nw,self.thetapnts))
-			dpsidRdZ_hold2D = np.ones((self.nw,self.thetapnts))
+			Bsqrd = np.ones(self.nw)		
+			Rs_hold2D = np.ones((self.nw, self.thetapnts))
+			Zs_hold2D = np.ones((self.nw, self.thetapnts))
+			Btot_hold2D = np.ones((self.nw, self.thetapnts))
+			Bp_hold2D = np.ones((self.nw, self.thetapnts))
+			Bt_hold2D = np.ones((self.nw, self.thetapnts))
+			dpsidR_hold2D = np.ones((self.nw, self.thetapnts))
+			dpsidZ_hold2D = np.ones((self.nw, self.thetapnts))
+			d2psidR2_hold2D = np.ones((self.nw, self.thetapnts))
+			d2psidZ2_hold2D = np.ones((self.nw, self.thetapnts))
+			d2psidRdZ_hold2D = np.ones((self.nw, self.thetapnts))
 
-			BpRFunc = interp.RectBivariateSpline(RZdict['Zs1D'],RZdict['Rs1D'],self.Bp_R,kx=1,ky=1)
-			BpZFunc = interp.RectBivariateSpline(RZdict['Zs1D'],RZdict['Rs1D'],self.Bp_Z,kx=1,ky=1)
-			dBpdRFunc = interp.RectBivariateSpline(RZdict['Zs1D'],RZdict['Rs1D'],dBp_dR,kx=1,ky=1)
-			dBpdZFunc = interp.RectBivariateSpline(RZdict['Zs1D'],RZdict['Rs1D'],dBp_dZ,kx=1,ky=1)
-			dpsidRdZFunc = interp.RectBivariateSpline(RZdict['Zs1D'],RZdict['Rs1D'],dpsi_dRdZ,kx=1,ky=1)
+			dpsidRFunc = interp.RectBivariateSpline(RZdict['Rs1D'], RZdict['Zs1D'], self.dpsidR.T)
+			dpsidZFunc = interp.RectBivariateSpline(RZdict['Rs1D'], RZdict['Zs1D'], self.dpsidZ.T)
+			d2psidR2Func = interp.RectBivariateSpline(RZdict['Rs1D'], RZdict['Zs1D'], d2psi_dR2.T)
+			d2psidZ2Func = interp.RectBivariateSpline(RZdict['Rs1D'], RZdict['Zs1D'], d2psi_dZ2.T)
+			d2psidRdZFunc = interp.RectBivariateSpline(RZdict['Rs1D'], RZdict['Zs1D'], d2psi_dRdZ.T)
 
 			if(FluxSurfList == None):
 				FluxSurfList = self.get_allFluxSur()
 				
-			for i in enumerate(self.PSIdict['psiN1D']):
-				R_hold = FluxSurfList[i[0]]['Rs']
-				Z_hold = FluxSurfList[i[0]]['Zs']
+			for i in xrange(self.nw):
+				R_hold = FluxSurfList[i]['Rs']
+				Z_hold = FluxSurfList[i]['Zs']
+				
+				Rs_hold2D[i,:] = R_hold
+				Zs_hold2D[i,:] = Z_hold
+				Bsqrd[i] = FluxSurfList[i]['Bsqrd']
+				Btot_hold2D[i,:] = FluxSurfList[i]['Bmod']
+				Bp_hold2D[i,:] = FluxSurfList[i]['Bp']
+				Bt_hold2D[i,:] = FluxSurfList[i]['Bt']
+				dpsidR_hold2D[i,:] = dpsidRFunc.ev(R_hold, Z_hold)
+				dpsidZ_hold2D[i,:] = dpsidZFunc.ev(R_hold, Z_hold)
+				d2psidR2_hold2D[i,:] = d2psidR2Func.ev(R_hold, Z_hold)
+				d2psidZ2_hold2D[i,:] = d2psidZ2Func.ev(R_hold, Z_hold)
+				d2psidRdZ_hold2D[i,:] = d2psidRdZFunc.ev(R_hold, Z_hold)
 
-				Bp_R_hold = BpRFunc.ev(Z_hold,R_hold)
-				Bp_Z_hold = BpZFunc.ev(Z_hold,R_hold)
-				dBpdR_hold = dBpdRFunc.ev(Z_hold,R_hold)
-				dBpdZ_hold = dBpdZFunc.ev(Z_hold,R_hold)
-				dpsidRdZ_hold = dpsidRdZFunc.ev(Z_hold,R_hold)
-
-				Rs_hold2D[i[0],:] = R_hold
-				Zs_hold2D[i[0],:] = Z_hold
-				Bsqrd[i[0]] = FluxSurfList[i[0]]['Bsqrd']
-				Btot_hold2D[i[0],:] = FluxSurfList[i[0]]['Bmod']
-				Bp_hold2D[i[0],:] = FluxSurfList[i[0]]['Bp']
-				Bt_hold2D[i[0],:] = FluxSurfList[i[0]]['Bt']
-				Bp_R_hold2D[i[0],:] = Bp_R_hold
-				Bp_Z_hold2D[i[0],:] = Bp_Z_hold
-				dBpdR_hold2D[i[0],:] = dBpdR_hold
-				dBpdZ_hold2D[i[0],:] = dBpdZ_hold
-				dpsidRdZ_hold2D[i[0],:] = dpsidRdZ_hold
-
-			return {'dpsidZ_2D':Bp_Z_hold2D,'dpsidR_2D':Bp_R_hold2D,'d2psidR2_2D':dBpdR_hold2D,'d2psidZ2_2D':dBpdZ_hold2D,
-					'd2psidRdZ_2D':dpsidRdZ_hold2D,'Bp_2D':Bp_hold2D,'Bt_2D':Bt_hold2D,'Btot_2D':Btot_hold2D,
+			return {'dpsidZ_2D':dpsidZ_hold2D,'dpsidR_2D':dpsidR_hold2D,'d2psidR2_2D':d2psidR2_hold2D,'d2psidZ2_2D':d2psidZ2_hold2D,
+					'd2psidRdZ_2D':d2psidRdZ_hold2D,'Bp_2D':Bp_hold2D,'Bt_2D':Bt_hold2D,'Btot_2D':Btot_hold2D,
 					'Rs_2D':Rs_hold2D,'Zs_2D':Zs_hold2D}
 					
 					
@@ -402,7 +395,7 @@ class equilParams:
 			paramDICT['btor1D'] = btor1D
 
 			# toroidal flux
-			paramDICT['psitorN1D'] = self.getTorPsi(qprof1D)['psitorN1D']
+			paramDICT['psitorN1D'] = self.getTorPsi()['psitorN1D']
 
 			return paramDICT
 		
@@ -424,7 +417,40 @@ class equilParams:
 			Z = r*np.sin(theta) + self.zmaxis
 	
 			return R, Z
-
+			
+		# ----------------------------------------------------------------------------------------
+		def get_j2D(self):
+			mu0 = 4*np.pi*1e-7
+			jR = np.zeros(self.RZdict['Rs2D'].shape)
+			jZ = np.zeros(self.RZdict['Rs2D'].shape)
+			jtor = np.zeros(self.RZdict['Rs2D'].shape)
+	
+			for i in xrange(self.nw):
+				jR[:,i] = -deriv(self.Bt_2D[:,i], self.RZdict['Zs2D'][:,i])
+				jtor[:,i] = deriv(self.B_R[:,i], self.RZdict['Zs2D'][:,i])
+		
+			for i in xrange(self.nh):
+				jZ[i,:] = deriv(self.Bt_2D[i,:], self.RZdict['Rs2D'][i,:])
+				jtor[i,:] -= deriv(self.B_Z[i,:], self.RZdict['Rs2D'][i,:])
+		
+			jZ += self.Bt_2D/self.RZdict['Rs2D']
+	
+			jR /= mu0
+			jZ /= mu0
+			jtor /= mu0	
+			
+			idx = np.where((self.PSIdict['psiN_2D'] > 1.0) | (self.RZdict['Zs2D'] < -1.3)) 
+			jR[idx] = 0
+			jZ[idx] = 0
+			jtor[idx] = 0
+	
+			jpar = (jR*self.B_R + jZ*self.B_Z + jtor*self.Bt_2D)
+			jpar /= np.sqrt(self.B_R**2 + self.B_Z**2 + self.Bt_2D**2)
+			jtot = np.sqrt(jR**2 + jZ**2 + jtor**2)
+	
+			return {'R':self.RZdict['Rs2D'], 'Z':self.RZdict['Zs2D'], 'j2D':jtot, 'jpar2D':jpar,
+					'jR2D':jR, 'jZ2D':jZ, 'jtor2D':jtor}
+	
 
 		# --------------------------------------------------------------------------------
 		# --------------------------------------------------------------------------------
@@ -440,8 +466,8 @@ class equilParams:
 				Zneu = litr*np.sin(theta)+zmaxis
 				Rbac = (litr-h)*np.cos(theta)+rmaxis
 				Zbac = (litr-h)*np.sin(theta)+zmaxis
-				f = psiFunc.ev(Zneu,Rneu) - psiNVal
-				df = (psiFunc.ev(Zbac,Rbac) - psiFunc.ev(Zneu,Rneu))/(-1*h)
+				f = psiFunc.ev(Rneu,Zneu) - psiNVal
+				df = (psiFunc.ev(Rbac,Zbac) - psiFunc.ev(Rneu,Zneu))/(-1*h)
 				dlitr = f/df
 				litr -=dlitr
 				n +=1
@@ -599,7 +625,7 @@ class equilParams:
 		def __funct__(self, r, theta, psi0):
 			R = r*np.cos(theta) + self.rmaxis
 			Z = r*np.sin(theta) + self.zmaxis
-			psi = self.psiFunc.ev(Z, R)	
+			psi = self.psiFunc.ev(R, Z)	
 			f = psi - psi0
 			return f
 
