@@ -111,7 +111,8 @@ class equilParams:
 		# --------------------------------------------------------------------------------
 		# 1-D normalized toroidal flux
 		# dpsitor/dpsipol = q  ->  psitor = integral(q(psipol) * dpsipol)
-		def getTorPsi(self):
+		# dummy input variable for backward compatability <-> this input is unused!!!
+		def getTorPsi(self, dummy = None):
 			dpsi = (self.siBry - self.siAxis)/(self.nw - 1) * 2*np.pi
 			hold = integ.cumtrapz(self.PROFdict['q_prof'], dx = dpsi) * np.sign(self.data.get('bcentr'))
 			psitor = np.append(0, hold)
