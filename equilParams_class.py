@@ -440,7 +440,7 @@ class equilParams:
 			jZ /= mu0
 			jtor /= mu0	
 			
-			idx = np.where((self.PSIdict['psiN_2D'] > 1.0) | (self.RZdict['Zs2D'] < -1.3)) 
+			idx = np.where((self.PSIdict['psiN_2D'] > 1.0) | (abs(self.RZdict['Zs2D']) > 1.3)) 
 			jR[idx] = 0
 			jZ[idx] = 0
 			jtor[idx] = 0
@@ -544,7 +544,7 @@ class equilParams:
 			while(ratio > eps):
 				# get psi for the current R, Z
 				psi_now = get_psi.ev(R.flatten(), Z.flatten())
-				psi_now[np.abs(psi_now) < eps] = 0		# check for small values (no negatives!)
+				psi_now[np.abs(psi_now) < 1e-7] = 0		# check for small values (no negatives!)
 				psi_now = psi_now.reshape(R.shape)
 				rho_now = np.sqrt(psi_now)
 			
