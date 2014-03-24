@@ -69,7 +69,7 @@ class equilParams:
 			fprime = self.data.get('ffprime')/fpol
 			fpfunc = interp.UnivariateSpline(np.linspace(0.,1.,np.size(fprime)),fprime,s=0)
 			ffprime = self.data.get('ffprime')
-			ffpfunc = interp.UnivariateSpline(np.linspace(0.,1.,np.size(ffprime)),fprime,s=0)
+			ffpfunc = interp.UnivariateSpline(np.linspace(0.,1.,np.size(ffprime)),ffprime,s=0)
 			pprime = self.data.get('pprime')
 			ppfunc = interp.UnivariateSpline(np.linspace(0.,1.,np.size(pprime)),pprime,s=0)
 			pres = self.data.get('pres')
@@ -190,7 +190,6 @@ class equilParams:
 			d2psi_dZ2, _ = np.gradient(self.dpsidZ, RZdict['dZ'], RZdict['dR'])
 			d2psi_dRdZ, d2psi_dR2 = np.gradient(self.dpsidR, RZdict['dZ'], RZdict['dR'])
 	
-			Bsqrd = np.ones(self.nw)		
 			Rs_hold2D = np.ones((self.nw, self.thetapnts))
 			Zs_hold2D = np.ones((self.nw, self.thetapnts))
 			Btot_hold2D = np.ones((self.nw, self.thetapnts))
@@ -217,7 +216,6 @@ class equilParams:
 				
 				Rs_hold2D[i,:] = R_hold
 				Zs_hold2D[i,:] = Z_hold
-				Bsqrd[i] = FluxSurfList[i]['Bsqrd']
 				Btot_hold2D[i,:] = FluxSurfList[i]['Bmod']
 				Bp_hold2D[i,:] = FluxSurfList[i]['Bp']
 				Bt_hold2D[i,:] = FluxSurfList[i]['Bt']
@@ -242,7 +240,7 @@ class equilParams:
 			if(FluxSurfList == None):
 				FluxSurfList = self.get_allFluxSur()
 			if(Bdict == None): 
-				Bdict = self.getB_2D(FluxSurfList)
+				Bdict = self.getBs_2D(FluxSurfList)
 
 			for i in enumerate(self.PSIdict['psiN1D']):
 				psiNVal = i[1]
@@ -292,10 +290,10 @@ class equilParams:
 											
 			# parallel current calc
 			# <jpar> = <(J (dot) B)>/B0 = (fprime*<B^2>/mu0 + pprime*fpol)/B0
-			jpar1D = (PROFdict['fpfunc'](PSIdict['psiN1D'])*Bsqrd_prof/mu0 +PROFdict['ppfunc'](PSIdict['psiN1D'])*PROFdict['ffunc'](PSIdict['psiN1D']))/self.bcentr/1.e6
+			jpar1D = (PROFdict['fprime']*Bsqrd_prof/mu0 + PROFdict['pprime']*PROFdict['fpol'])/self.bcentr/1.e6
 	
 			# <jtor> = <R*pprime + ffprime/R/mu0>
-			# jtor1D = np.abs(self.Rsminor*PROFdict['ppfunc'](PSIdict['psiN1D']) +(PROFdict['ffpfunc'](PSIdict['psiN1D'])/self.Rsminor/mu0))/1.e6
+			# jtor1D = np.abs(self.Rsminor*PROFdict['pprime'] +(PROFdict['ffprime']/self.Rsminor/mu0))/1.e6
 			if get_jtor:
 				jtor1D = self. jtor_profile(FluxSurfList)
 			else: 
@@ -320,7 +318,7 @@ class equilParams:
 
 			# get flux surface average
 			for i, psi in enumerate(PSIdict['psiN1D']):
-				jtorSurf = PROFdict['ppfunc'](psi)*FluxSurfList[i]['Rs'] + PROFdict['ffpfunc'](psi)/FluxSurfList[i]['Rs']/mu0
+				jtorSurf = PROFdict['pprime'][i]*FluxSurfList[i]['Rs'] + PROFdict['ffprime'][i]/FluxSurfList[i]['Rs']/mu0
 				f_jtorSurf = eq.interpPeriodic(self.theta, jtorSurf, copy = False)
 				jtor1D[i] = FluxSurfList[i]['FS'].average(f_jtorSurf)
 
