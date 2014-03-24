@@ -138,10 +138,9 @@ class equilParams:
 			Bp_hold = self.BpFunc.ev(R_hold, Z_hold)
 			fpol_psiN = self.PROFdict['ffunc'](psiNVal)*np.ones(np.size(Bp_hold))
 			fluxSur = eq.FluxSurface(fpol_psiN, R_hold, Z_hold, Bp_hold, self.theta)
-			Bsqrd = fluxSur.Bsqav()
 
-			return {'Rs':R_hold, 'Zs':Z_hold, 'Bp':Bp_hold, 'Bt':fluxSur._Bt, 'Bmod':fluxSur._B, 'Bsqrd':Bsqrd,
-					'fpol_psiN':fpol_psiN}
+			return {'Rs':R_hold, 'Zs':Z_hold, 'Bp':Bp_hold, 'Bt':fluxSur._Bt, 'Bmod':fluxSur._B,
+					'fpol_psiN':fpol_psiN, 'FS':fluxSur}
 
 
 		# --------------------------------------------------------------------------------
@@ -163,20 +162,16 @@ class equilParams:
 			FluxSurList = []
 			R,Z = self.__get_RZ__(self.theta, self.PSIdict['psiN1D'], quiet = True)
 				
-			for i in enumerate(self.PSIdict['psiN1D']):
-				psiNVal = i[1]
-				# FluxSur = self.getBs_FluxSur(psiNVal)
-				
-				R_hold = R[i[0],:]
-				Z_hold = Z[i[0],:]
+			for i, psiNVal in enumerate(self.PSIdict['psiN1D']):
+				R_hold = R[i,:]
+				Z_hold = Z[i,:]
 				
 				Bp_hold = self.BpFunc.ev(R_hold, Z_hold)
-				fpol_psiN = self.PROFdict['ffunc'](psiNVal)*np.ones(np.size(Bp_hold))
+				fpol_psiN = self.PROFdict['fpol'][i] * np.ones(self.thetapnts)
 				fluxSur = eq.FluxSurface(fpol_psiN, R_hold, Z_hold, Bp_hold, self.theta)
-				Bsqrd = fluxSur.Bsqav()
 
 				FluxSur = {'Rs':R_hold, 'Zs':Z_hold, 'Bp':Bp_hold, 'Bt':fluxSur._Bt, 
-						   'Bmod':fluxSur._B, 'Bsqrd':Bsqrd, 'fpol_psiN':fpol_psiN, 'FS':fluxSur}
+						   'Bmod':fluxSur._B, 'fpol_psiN':fpol_psiN, 'FS':fluxSur}
 					
 				FluxSurList.append(FluxSur)
 
@@ -286,7 +281,7 @@ class equilParams:
 				FluxSurfList = self.get_allFluxSur()
 
 			for i, psi in enumerate(PSIdict['psiN1D']):
-				Bsqrd_prof[i] = FluxSurfList[i]['Bsqrd']
+				Bsqrd_prof[i] = FluxSurfList[i]['FS'].Bsqav()
 											
 			# parallel current calc
 			# <jpar> = <(J (dot) B)>/B0 = (fprime*<B^2>/mu0 + pprime*fpol)/B0
@@ -298,7 +293,7 @@ class equilParams:
 				jtor1D = self. jtor_profile(FluxSurfList)
 			else: 
 				jtor1D = 0
-			
+				
 			return {'jpar':jpar1D, 'jtor':jtor1D, 'Bsqrd':Bsqrd_prof}
 			
 		
