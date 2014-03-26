@@ -137,7 +137,7 @@ class equilParams:
 
 			Bp_hold = self.BpFunc.ev(R_hold, Z_hold)
 			fpol_psiN = self.PROFdict['ffunc'](psiNVal)*np.ones(np.size(Bp_hold))
-			fluxSur = eq.FluxSurface(fpol_psiN, R_hold, Z_hold, Bp_hold, self.theta)
+			fluxSur = eq.FluxSurface(fpol_psiN[0:-1], R_hold[0:-1], Z_hold[0:-1], Bp_hold[0:-1], self.theta[0:-1])
 
 			return {'Rs':R_hold, 'Zs':Z_hold, 'Bp':Bp_hold, 'Bt':fluxSur._Bt, 'Bmod':fluxSur._B,
 					'fpol_psiN':fpol_psiN, 'FS':fluxSur}
@@ -168,7 +168,9 @@ class equilParams:
 				
 				Bp_hold = self.BpFunc.ev(R_hold, Z_hold)
 				fpol_psiN = self.PROFdict['fpol'][i] * np.ones(self.thetapnts)
-				fluxSur = eq.FluxSurface(fpol_psiN, R_hold, Z_hold, Bp_hold, self.theta)
+				
+				# eq.FluxSurface requires theta = [0:2pi] without the last point
+				fluxSur = eq.FluxSurface(fpol_psiN[0:-1], R_hold[0:-1], Z_hold[0:-1], Bp_hold[0:-1], self.theta[0:-1])
 
 				FluxSur = {'Rs':R_hold, 'Zs':Z_hold, 'Bp':Bp_hold, 'Bt':fluxSur._Bt, 
 						   'Bmod':fluxSur._B, 'fpol_psiN':fpol_psiN, 'FS':fluxSur}
@@ -314,7 +316,7 @@ class equilParams:
 			# get flux surface average
 			for i, psi in enumerate(PSIdict['psiN1D']):
 				jtorSurf = PROFdict['pprime'][i]*FluxSurfList[i]['Rs'] + PROFdict['ffprime'][i]/FluxSurfList[i]['Rs']/mu0
-				f_jtorSurf = eq.interpPeriodic(self.theta, jtorSurf, copy = False)
+				f_jtorSurf = eq.interpPeriodic(self.theta[0:-1], jtorSurf[0:-1], copy = False)
 				jtor1D[i] = FluxSurfList[i]['FS'].average(f_jtorSurf)
 
 			# <jtor> = <R*pprime + ffprime/R/mu0>
