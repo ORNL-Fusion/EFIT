@@ -11,6 +11,7 @@ try:
     # erf function available from Python 3.2
     from math import erf
 except ImportError:
+    print 'erf import failed, use self-defined method'
     # Try SciPy
     try:
         from scipy.special import erf
@@ -35,8 +36,9 @@ except ImportError:
             return sign*y # erf(-x) = -erf(x)
 
 try:
-    import scipy.interp1d
+    from scipy.interpolate import interp1d
 except:
+    print 'interp1d import failed, use self-defined method'
     # Define interpolation functor using NumPy routine
     from numpy import interp
     class interp1d:
@@ -52,9 +54,13 @@ except:
            return interp(x, self._xp, self._yp)
 
 try:
-    import scipy.integrate.quad as integrate
-    #print("Using SciPy integrate.quad")
+    from scipy.integrate import simps
+    def integrate(f, a, b, n = 301):
+        x = np.linspace(a, b, n)
+        y = f(x)
+        return simps(y, x)
 except ImportError:
+    print 'integrate import failed, use self-defined method'
     # Define simple integrate function
     def integrate(f, a, b, n=100 ):
         """Approximate the definite integral of f from a to b by Simpson's rule"""
@@ -575,8 +581,15 @@ class interpPeriodic:
         except:
             slope = 0.0
 
-        if np.isnan(slope):
-            slope = np.array(0.0)
-        if np.isinf(slope):
-            slope = np.array(0.0)
+        if isinstance(slope, np.ndarray):
+            if any(np.isnan(slope)):
+                slope[np.isnan(slope)] = 0.0
+            if any(np.isinf(slope)):
+                slope[np.isinf(slope)] = 0.0
+        else:
+            if np.isnan(slope):
+                slope = np.array(0.0)
+            if np.isinf(slope):
+                slope = np.array(0.0)
+                
         return ym + slope * (new_x - xm)
