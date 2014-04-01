@@ -138,8 +138,10 @@ class equilParams:
 			Bp_hold = self.BpFunc.ev(R_hold, Z_hold)
 			fpol_psiN = self.PROFdict['ffunc'](psiNVal)*np.ones(np.size(Bp_hold))
 			fluxSur = eq.FluxSurface(fpol_psiN[0:-1], R_hold[0:-1], Z_hold[0:-1], Bp_hold[0:-1], self.theta[0:-1])
+			Bt_hold = np.append(fluxSur._Bt, fluxSur._Bt[0])	# add last point = first point
+			Bmod = np.append(fluxSur._B, fluxSur._B[0])			# add last point = first point
 
-			return {'Rs':R_hold, 'Zs':Z_hold, 'Bp':Bp_hold, 'Bt':fluxSur._Bt, 'Bmod':fluxSur._B,
+			return {'Rs':R_hold, 'Zs':Z_hold, 'Bp':Bp_hold, 'Bt':Bt_hold, 'Bmod':Bmod,
 					'fpol_psiN':fpol_psiN, 'FS':fluxSur}
 
 
@@ -171,9 +173,11 @@ class equilParams:
 				
 				# eq.FluxSurface requires theta = [0:2pi] without the last point
 				fluxSur = eq.FluxSurface(fpol_psiN[0:-1], R_hold[0:-1], Z_hold[0:-1], Bp_hold[0:-1], self.theta[0:-1])
+				Bt_hold = np.append(fluxSur._Bt, fluxSur._Bt[0])	# add last point = first point
+				Bmod = np.append(fluxSur._B, fluxSur._B[0])			# add last point = first point
 
-				FluxSur = {'Rs':R_hold, 'Zs':Z_hold, 'Bp':Bp_hold, 'Bt':fluxSur._Bt, 
-						   'Bmod':fluxSur._B, 'fpol_psiN':fpol_psiN, 'FS':fluxSur}
+				FluxSur = {'Rs':R_hold, 'Zs':Z_hold, 'Bp':Bp_hold, 'Bt':Bt_hold, 
+						   'Bmod':Bmod, 'fpol_psiN':fpol_psiN, 'FS':fluxSur}
 					
 				FluxSurList.append(FluxSur)
 
