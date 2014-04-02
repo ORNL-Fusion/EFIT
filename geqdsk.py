@@ -30,12 +30,23 @@ class Geqdsk:
 	lines =  open(filename, 'r').readlines()
 
 	# first line
-	m = re.search(r'^\s*([\w\s\_\/\#]+)\s+\d+\s+(\d+)\s+(\d+)\s*$', lines[0])
-	self.data['case'] = m.group(1), "Identification character string"
-	self.data['nw'] = int(m.group(2)), "Number of horizontal R grid points"
-	self.data['nh'] = int(m.group(3)), "Number of vertical Z grid points"
+	#m = re.search(r'^\s*([\w\s\_\/\#]+)\s+\d+\s+(\d+)\s+(\d+)\s*$', lines[0])
+	line = lines[0].strip().split()
+	self.data['case'] = ' '.join(line[0:-3]), "Identification character string" 	#m.group(1)
+	self.data['nw'] = int(line[-2]), "Number of horizontal R grid points" 			#int(m.group(2))
+	self.data['nh'] = int(line[-1]), "Number of vertical Z grid points" 			#int(m.group(3))
 
-	fltsPat = r'^\s*([ \-]\d\.\d+[Ee][\+\-]\d\d)([ \-]\d\.\d+[Ee][\+\-]\d\d)([ \-]\d\.\d+[Ee][\+\-]\d\d)([ \-]\d\.\d+[Ee][\+\-]\d\d)([ \-]\d\.\d+[Ee][\+\-]\d\d)\s*$'
+	fltsPat_tight = r'^\s*([ \-]\d\.\d+[Ee][\+\-]\d\d)([ \-]\d\.\d+[Ee][\+\-]\d\d)([ \-]\d\.\d+[Ee][\+\-]\d\d)([ \-]\d\.\d+[Ee][\+\-]\d\d)([ \-]\d\.\d+[Ee][\+\-]\d\d)\s*$'
+	fltsPat_space = r'^\s*( [ \-]\d\.\d+[Ee][\+\-]\d\d)( [ \-]\d\.\d+[Ee][\+\-]\d\d)( [ \-]\d\.\d+[Ee][\+\-]\d\d)( [ \-]\d\.\d+[Ee][\+\-]\d\d)( [ \-]\d\.\d+[Ee][\+\-]\d\d)\s*$'
+	
+	# check which format
+	m = re.search(fltsPat_tight, lines[1])
+	if (m == None):	
+		spaced = True
+		fltsPat = fltsPat_space
+	else: 
+		spaced = False
+		fltsPat = fltsPat_tight
 	
 	# 2nd line
 	m = re.search(fltsPat, lines[1])
@@ -69,11 +80,17 @@ class Geqdsk:
 	# read remaining data
 	data = []
 	counter = 5
+	if spaced: 
+		fltsPat = r'^\s*( [ \-]\d\.\d+[Ee][\+\-]\d\d)'
+		evalPat = r'(\d)( [ \-]\d\.)'
+	else: 
+		fltsPat = r'^\s*[ \-]\d\.\d+[Ee][\+\-]\d\d'
+		evalPat = r'(\d)([ \-]\d\.)'
 	while 1:
 		line = lines[counter]
-		m = re.match(r'^\s*[ \-]\d\.\d+[Ee][\+\-]\d\d', line)
+		m = re.match(fltsPat, line)
 		if not m: break
-		data += eval('[' + re.sub(r'(\d)([ \-]\d\.)', '\\1,\\2', line) + ']')
+		data += eval('[' + re.sub(evalPat, '\\1,\\2', line) + ']')
 		counter += 1
 
 	nw = self.data['nw'][0]
@@ -101,10 +118,10 @@ class Geqdsk:
 	data = []
 	while 1:
 		line = lines[counter]
-		m = re.search(r'^\s*[ \-]\d\.\d+[Ee][\+\-]\d\d', line)
+		m = re.search(fltsPat, line)
 		counter += 1
 		if not m: break
-		data += eval('[' + re.sub(r'(\d)([ \-]\d\.)', '\\1,\\2', line) + ']')
+		data += eval('[' + re.sub(evalPat, '\\1,\\2', line) + ']')
 	self.data['rbbbs'] = numpy.zeros( (nbbbs,), numpy.float64 ), "R of boundary points in meter"
 	self.data['zbbbs'] = numpy.zeros( (nbbbs,), numpy.float64 ), "Z of boundary points in meter"
 	for i in range(nbbbs):
