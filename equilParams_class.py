@@ -409,9 +409,19 @@ class equilParams:
 				N = len(theta)
 				
 			r = np.zeros(theta.shape)
-	
+			
+			# get maximum r from separatrix in g-file
+			Rsep = self.data.get('rbbbs')
+			Zsep = self.data.get('zbbbs')
+			idxup = Zsep.argmax()
+			idxdwn = Zsep.argmin()
+			rup = np.sqrt((Rsep[idxup] - self.rmaxis)**2 + (Zsep[idxup] - self.zmaxis)**2)
+			rdwn = np.sqrt((Rsep[idxdwn] - self.rmaxis)**2 + (Zsep[idxdwn] - self.zmaxis)**2)
+			rmax = max([rup, rdwn])
+			
+			# iterate
 			for i in xrange(N): 
-				r[i] = self.__bisec__(psi0, theta[i])
+				r[i] = self.__bisec__(psi0, theta[i], b = rmax)
 	
 			R = r*np.cos(theta) + self.rmaxis
 			Z = r*np.sin(theta) + self.zmaxis
