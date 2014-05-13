@@ -324,7 +324,7 @@ class equilParams:
 				jtor1D[i] = FluxSurfList[i]['FS'].average(f_jtorSurf)
 
 			# <jtor> = <R*pprime + ffprime/R/mu0>
-			jtor1D = np.abs(jtor1D)/1.e6
+			jtor1D = np.abs(jtor1D)/1.e6 * sign(self.data.get('current'))
 			return jtor1D
 
 			
