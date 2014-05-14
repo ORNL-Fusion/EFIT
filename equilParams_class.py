@@ -291,7 +291,7 @@ class equilParams:
 											
 			# parallel current calc
 			# <jpar> = <(J (dot) B)>/B0 = (fprime*<B^2>/mu0 + pprime*fpol)/B0
-			jpar1D = (PROFdict['fprime']*Bsqrd_prof/mu0 + PROFdict['pprime']*PROFdict['fpol'])/self.bcentr/1.e6
+			jpar1D = (PROFdict['fprime']*Bsqrd_prof/mu0 + PROFdict['pprime']*PROFdict['fpol']) / self.bcentr/1.e6 * np.sign(self.data.get('current'))
 	
 			# <jtor> = <R*pprime + ffprime/R/mu0>
 			# jtor1D = np.abs(self.Rsminor*PROFdict['pprime'] +(PROFdict['ffprime']/self.Rsminor/mu0))/1.e6
@@ -324,7 +324,7 @@ class equilParams:
 				jtor1D[i] = FluxSurfList[i]['FS'].average(f_jtorSurf)
 
 			# <jtor> = <R*pprime + ffprime/R/mu0>
-			jtor1D = np.abs(jtor1D)/1.e6 * sign(self.data.get('current'))
+			jtor1D = np.abs(jtor1D)/1.e6 * np.sign(self.data.get('current'))
 			return jtor1D
 
 			
@@ -447,16 +447,17 @@ class equilParams:
 	
 			jR /= mu0
 			jZ /= mu0
-			jtor /= mu0	
+			jtor /= mu0
 			
 			idx = np.where((self.PSIdict['psiN_2D'] > 1.0) | (abs(self.RZdict['Zs2D']) > 1.3)) 
 			jR[idx] = 0
 			jZ[idx] = 0
 			jtor[idx] = 0
 	
-			jpar = (jR*self.B_R + jZ*self.B_Z + jtor*self.Bt_2D)
+			jpar = (jR*self.B_R + jZ*self.B_Z + jtor*self.Bt_2D) * np.sign(self.data.get('current'))
 			jpar /= np.sqrt(self.B_R**2 + self.B_Z**2 + self.Bt_2D**2)
 			jtot = np.sqrt(jR**2 + jZ**2 + jtor**2)
+			jtor *= np.sign(self.data.get('current'))
 	
 			return {'R':self.RZdict['Rs2D'], 'Z':self.RZdict['Zs2D'], 'j2D':jtot, 'jpar2D':jpar,
 					'jR2D':jR, 'jZ2D':jZ, 'jtor2D':jtor}
