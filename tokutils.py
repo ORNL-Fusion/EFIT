@@ -11,6 +11,8 @@
 #   
 #   f = interpPeriod( x, y, copy=True, period=2.*pi)  Return a callable object
 
+from math import exp
+
 try:
     # erf function available from Python 3.2
     from math import erf
@@ -19,7 +21,6 @@ except ImportError:
     try:
         from scipy.special import erf
     except ImportError:
-        import math
         # No erf function, so define
         def erf(x):
             # save the sign of x
@@ -36,7 +37,7 @@ except ImportError:
 
             # A&S formula 7.1.26
             t = 1.0/(1.0 + p*x)
-            y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*math.exp(-x*x)
+            y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*exp(-x*x)
             return sign*y # erf(-x) = -erf(x)
 
 try:
@@ -44,7 +45,7 @@ try:
     #print("Using SciPy integrate.quad")
 except ImportError:
     # Define simple integrate function
-    def integrate(f, a, b, n=100 ):
+    def integrate( f, a, b, n=100 ):
         """Approximate the definite integral of f from a to b by Simpson's rule"""
         
         if n % 2 != 0:
@@ -98,7 +99,8 @@ class interpPeriodic:
         self._period = period
         
     def __call__(self, x):
-        """ Interpolate
+        """ Interpolate 
+        
         """
         
         new_x = x % self._period
@@ -121,5 +123,5 @@ class interpPeriodic:
         yp = self._y[ip]
         
         slope = (yp - ym) / (xp - xm)
-        print 'tokutlis: {} {}'.format(ym,xm)
+        
         return ym + slope * (new_x - xm)
