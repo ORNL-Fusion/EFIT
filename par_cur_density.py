@@ -1,5 +1,4 @@
 import numpy as np
-import scipy.integrate as integ
 import scipy.interpolate as interp
 import geqdsk as gdsk
 import equilibrium as eq
@@ -7,7 +6,7 @@ import equilibrium as eq
 g_fnam = 'g148712.04101'
 #g_fnam = 'g149189.02400'
 
-def get_currs(gfileNam,nw=0,nh=0,thetapnts=0,grid2G=0,nakhdf=0):
+def get_currs(gfileNam,nw=0,nh=0,thetapnts=0,grid2G=0):
 	import scipy.constants
 	mu0 = scipy.constants.mu_0
 

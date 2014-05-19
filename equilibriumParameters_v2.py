@@ -1,5 +1,4 @@
 import numpy as np
-#import scipy.integrate as integ
 import scipy.interpolate as interp
 import EFIT.geqdsk as gdsk
 import EFIT.equilibrium as eq
@@ -10,7 +9,7 @@ reload(eq)
 g_fnam = 'g148712.04101'
 #g_fnam = 'g149189.02400'
 
-def equilParams(gfileNam,nw=0,nh=0,thetapnts=0,grid2G = False,makhdf = False):
+def equilParams(gfileNam,nw=0,nh=0,thetapnts=0,grid2G = False):
 	import scipy.constants
 	mu0 = scipy.constants.mu_0
 
@@ -153,7 +152,7 @@ def equilParams(gfileNam,nw=0,nh=0,thetapnts=0,grid2G = False,makhdf = False):
 	jpar1D = (fpfunc(psiN1D)*Bsqrd/mu0 +ppfunc(psiN1D)*ffunc(psiN1D))/bcentr/1.e6
 
 	#jtor [A/m**2] = R*pprime +ffprime/R/mu0
-	jtor1D = np.abs(Rsminor*ppfunc(psiN1D) +(ffpfunc(psiN1D)/Rsminor/mu0))/1.e6
+	jtor1D = np.abs(Rsminor*ppfunc(psiN1D) +(ffpfunc(psiN1D)/Rsminor/mu0))/1.e6 
 
 	#q profile
 	qprof1D = qfunc(psiN1D)
