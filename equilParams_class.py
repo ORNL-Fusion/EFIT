@@ -229,44 +229,44 @@ class equilParams:
 			return {'dpsidZ_2D':dpsidZ_hold2D,'dpsidR_2D':dpsidR_hold2D,'d2psidR2_2D':d2psidR2_hold2D,'d2psidZ2_2D':d2psidZ2_hold2D,
 					'd2psidRdZ_2D':d2psidRdZ_hold2D,'Bp_2D':Bp_hold2D,'Bt_2D':Bt_hold2D,'Btot_2D':Btot_hold2D,
 					'Rs_2D':Rs_hold2D,'Zs_2D':Zs_hold2D}
-					
-					
+
+
 		# --------------------------------------------------------------------------------
 		# normal and geodesic curvature, and local shear in 2-D plane
-		def get_Curv_Shear(self, FluxSurfList = None, Bdict = None):				
+		def get_Curv_Shear(self, FluxSurfList = None, Bdict = None):
 			curvNorm_2D = np.ones((self.nw,self.thetapnts))
 			curvGeo_2D = np.ones((self.nw,self.thetapnts))
 			shear_fl = np.ones((self.nw,self.thetapnts))
 
 			if(FluxSurfList == None):
 				FluxSurfList = self.get_allFluxSur()
-			if(Bdict == None): 
+			if(Bdict == None):
 				Bdict = self.getBs_2D(FluxSurfList)
 
 			for i in enumerate(self.PSIdict['psiN1D']):
 				psiNVal = i[1]
 				fprint_psiN = self.PROFdict['fpfunc'](psiNVal)*np.ones(self.thetapnts)
-				
+
 				R = FluxSurfList[i[0]]['Rs']
 				Bp = FluxSurfList[i[0]]['Bp']
 				B = FluxSurfList[i[0]]['Bmod']
-				fpol_psiN = FluxSurfList[i[0]]['fpol_psiN']		
-				
+				fpol_psiN = FluxSurfList[i[0]]['fpol_psiN']
+
 				kapt1 = (fpol_psiN**2)*(Bdict['dpsidR_2D'][i[0],:])
 				kapt2 = (Bdict['d2psidR2_2D'][i[0],:]*Bdict['dpsidZ_2D'][i[0],:]**2) + ((Bdict['dpsidR_2D'][i[0],:]**2)*Bdict['d2psidZ2_2D'][i[0],:])
 				kapt3 = (2*Bdict['dpsidR_2D'][i[0],:]*Bdict['d2psidRdZ_2D'][i[0],:]*Bdict['dpsidZ_2D'][i[0],:])
 				curvNorm_2D[i[0],:] = (kapt1 + Bdict['Rs_2D'][i[0],:]*(kapt2-kapt3))/(R**4 * Bp * B**2)
-				
+
 				kap2t1 = Bdict['d2psidRdZ_2D'][i[0],:]*(Bdict['dpsidR_2D'][i[0],:]**2 - Bdict['dpsidZ_2D'][i[0],:]**2)
 				kap2t2 = Bdict['dpsidR_2D'][i[0],:]*Bdict['dpsidZ_2D'][i[0],:]*(Bdict['d2psidR2_2D'][i[0],:] - Bdict['d2psidZ2_2D'][i[0],:])
 				kap2t3 = Bdict['dpsidZ_2D'][i[0],:] * R**2 * B**2
 				curvGeo_2D[i[0],:] = -fpol_psiN*(Bdict['Rs_2D'][i[0],:]*kap2t1 - kap2t2 + kap2t3)/(R**5 * Bp * B**3)
-			
+
 				coeft1 = fpol_psiN/(R**4 * Bp**2 * B**2)
 				coeft2 = ((Bdict['d2psidR2_2D'][i[0],:] - Bdict['d2psidZ2_2D'][i[0],:])*(Bdict['dpsidR_2D'][i[0],:]**2 - Bdict['dpsidZ_2D'][i[0],:]**2) +
 							(4*Bdict['dpsidR_2D'][i[0],:]*Bdict['d2psidRdZ_2D'][i[0],:]*Bdict['dpsidZ_2D'][i[0],:]))
 				sht2 = fpol_psiN*Bdict['dpsidR_2D'][i[0],:]/(R**3 * B**2)
-				sht3 = fprint_psiN*Bp**2/(B**2)
+				sht3 = fpol_psiN*Bp**2/(B**2)
 				shear_fl[i[0],:] = coeft1*coeft2 + sht2 - sht3
 
 			return {'curvNorm_2D':curvNorm_2D,'curvGeo_2D':curvGeo_2D,'localShear_2D':shear_fl}
