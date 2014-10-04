@@ -6,6 +6,10 @@ import numpy as np
 #	gpath (string)		->	path where to find g-file, default = current working dir
 
 def read_g_file(shot, time, gpath = '.'):
+	# in case those are passed in as strings
+	shot = int(shot)
+	time = int(time)
+
 	if not (gpath[-1] == '/'): gpath += '/'
 	with open(gpath + 'g' + format(shot,'06d') + '.' + format(time,'05d'), 'r') as f:
 		head = f.readline().split()
