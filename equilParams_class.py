@@ -260,7 +260,10 @@ class equilParams:
                 kap2t1 = Bdict['d2psidRdZ_2D'][i,:]*(Bdict['dpsidR_2D'][i,:]**2 - Bdict['dpsidZ_2D'][i,:]**2)
                 kap2t2 = Bdict['dpsidR_2D'][i,:]*Bdict['dpsidZ_2D'][i,:]*(Bdict['d2psidR2_2D'][i,:] - Bdict['d2psidZ2_2D'][i,:])
                 kap2t3 = Bdict['dpsidZ_2D'][i,:] * R**2 * B**2
-                curvGeo_2D[i, :] = -1*fpol_psiN*(Bdict['Rs_2D'][i, :]*(kap2t1 - kap2t2 + kap2t3))/(R**5 * Bp * B**3)
+                # curvGeo_2D[i, :] = -1*fpol_psiN*(Bdict['Rs_2D'][i, :]*(kap2t1 - kap2t2 + kap2t3))/(R**5 * Bp * B**3)
+                # maybe no -1 up front?
+                curvGeo_2D[i, :] = fpol_psiN*(Bdict['Rs_2D'][i, :]*(kap2t1 - kap2t2 + kap2t3))/(R**5 * Bp * B**3)
+
 
                 coeft1 = fpol_psiN/(R**4 * Bp**2 * B**2)
                 coeft2 = ((Bdict['d2psidR2_2D'][i, :] -
@@ -269,7 +272,7 @@ class equilParams:
                             (4*Bdict['dpsidR_2D'][i,:]*Bdict['d2psidRdZ_2D'][i,:]*Bdict['dpsidZ_2D'][i,:]))
                 sht2 = fpol_psiN*Bdict['dpsidR_2D'][i,:]/(R**3 * B**2)
                 sht3 = fprint_psiN*Bp**2/(B**2)
-                shear_fl[i, :] = -1*(coeft1*coeft2 + sht2 - sht3)
+                shear_fl[i, :] = (coeft1*coeft2 + sht2 - sht3)
 
             return {'curvNorm_2D': curvNorm_2D, 'curvGeo_2D': curvGeo_2D,
                     'localShear_2D': shear_fl, 'Rs_2D': Bdict['Rs_2D'], 'Zs_2D': Bdict['Zs_2D']}
