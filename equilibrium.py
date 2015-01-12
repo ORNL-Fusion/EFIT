@@ -33,7 +33,7 @@ except ImportError:
             # A&S formula 7.1.26
             t = 1.0/(1.0 + p*x)
             y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*math.exp(-x*x)
-            return sign*y # erf(-x) = -erf(x)
+            return sign*y  # erf(-x) = -erf(x)
 
 try:
     from scipy.interpolate import interp1d
@@ -41,6 +41,7 @@ except:
     print 'interp1d import failed, use self-defined method'
     # Define interpolation functor using NumPy routine
     from numpy import interp
+
     class interp1d:
         """ 1-D interpolation using NumPy's interp function
         """
@@ -50,37 +51,43 @@ except:
             # Store x & y, either just references, or a copy of the data
             self._xp = np.array(x, copy=copy)
             self._yp = np.array(y, copy=copy)
+
         def __call__(self, x):
-           return interp(x, self._xp, self._yp)
+            return interp(x, self._xp, self._yp)
 
 try:
     from scipy.integrate import simps
-    def integrate(f, a, b, n = 301):
+
+    def integrate(f, a, b, n=301):
         x = np.linspace(a, b, n)
+        delx = (b-a)/len(x)
         y = f(x)
-        return simps(y, x)
+        return simps(y, dx=delx)
 except ImportError:
     print 'integrate import failed, use self-defined method'
     # Define simple integrate function
-    def integrate(f, a, b, n=100 ):
+
+    def integrate(f, a, b, n=100):
         """Approximate the definite integral of f from a to b by Simpson's rule"""
 
-        if n % 2 != 0: raise ValueError("n must be even!")
-        h  = (float(b) - a)/n
+        if n % 2 != 0:
+            raise ValueError("n must be even!")
+        h = (float(b) - a)/n
         si = 0.0
         sp = 0.0
-    
+
         for i in xrange(1, n, 2):
             xk = a + i*h
             si += f(xk)
-            
+
         for i in xrange(2, n, 2):
             xk = a + i*h
             sp += f(xk)
-            
+
         s = 2*sp + 4*si + f(a) + f(b)
         return (h/3)*s
     #print("Using Simpson's rule for integration. Install SciPy for better method")
+
 
 class FluxSurface:
     """ Describes a single flux surface
@@ -137,7 +144,7 @@ class FluxSurface:
         self._Bt = f / r
         self._B   = np.sqrt(self._Bt**2 + self._Bp**2)
 
-        if theta == None:
+        if theta is None:
             # Define theta to be equally spaced (arbitrary) in range [0,2pi]
             self._theta = np.linspace(0.0, 2.*np.pi, num=self._ntheta, endpoint=False)
         else:
@@ -194,9 +201,9 @@ class FluxSurface:
         """
 
         # Integrate  ( var * dl/dtheta ) dtheta
-        return integrate( lambda x: var(x) * self._dldtheta(x), 0, 2*np.pi )
+        return integrate(lambda x: var(x) * self._dldtheta(x), 0, 2*np.pi )
 
-    def deriv(self, var, dtheta = 0.01):
+    def deriv(self, var, dtheta=0.01):
         """ Flux surface derivative
 
         result = d/dl(var)
@@ -573,7 +580,7 @@ class interpPeriodic:
 
         ym = self._y[im]
         yp = self._y[ip]
-        
+
         from warnings import filterwarnings
         filterwarnings('error')
         try:
@@ -591,5 +598,5 @@ class interpPeriodic:
                 slope = np.array(0.0)
             if np.isinf(slope):
                 slope = np.array(0.0)
-                
+
         return ym + slope * (new_x - xm)
