@@ -7,9 +7,10 @@ import EFIT.equilibrium as eq
 from Misc.deriv import deriv
 #reload(eq)
 
+
 class equilParams:
 
-        def __init__(self, gfileNam, nw = 0, nh = 0, thetapnts = 0, grid2G = True):
+        def __init__(self, gfileNam, nw=0, nh=0, thetapnts=0, grid2G=True):
             self.data = gdsk.Geqdsk()
             self.data.openFile(gfileNam)
 
@@ -19,8 +20,8 @@ class equilParams:
                 self.nh = self.data.get('nh')
                 self.thetapnts = 2*self.nh
             else:
-                self.nw=nw
-                self.nh=nh
+                self.nw = nw
+                self.nh = nh
                 self.thetapnts = thetapnts
             self.bcentr = np.abs(self.data.get('bcentr'))
             self.rmaxis = self.data.get('rmaxis')
@@ -28,7 +29,7 @@ class equilParams:
             self.Rmin = self.data.get('rleft')
             self.Rmax = self.Rmin + self.data.get('rdim')
             self.Rbdry = self.data.get('rbbbs').max()
-            self.Rsminor = np.linspace(self.rmaxis,self.Rbdry,self.nw)
+            self.Rsminor = np.linspace(self.rmaxis, self.Rbdry, self.nw)
             self.Zmin = self.data.get('zmid') - self.data.get('zdim')/2.0
             self.Zmax = self.data.get('zmid') + self.data.get('zdim')/2.0
             self.Zlowest = self.data.get('zbbbs').min()
@@ -88,9 +89,9 @@ class equilParams:
             Rs1D = np.linspace(self.Rmin, self.Rmax, self.nw)
             dZ = (self.Zmax - self.Zmin)/(self.nh - 1)
             Zs1D = np.linspace(self.Zmin, self.Zmax, self.nh)
-            Rs2D,Zs2D = np.meshgrid(Rs1D,Zs1D)
+            Rs2D, Zs2D = np.meshgrid(Rs1D, Zs1D)
 
-            return {'Rs1D':Rs1D,'dR':dR,'Zs1D':Zs1D,'dZ':dZ,'Rs2D':Rs2D,'Zs2D':Zs2D}
+            return {'Rs1D': Rs1D, 'dR': dR, 'Zs1D': Zs1D, 'dZ': dZ, 'Rs2D': Rs2D, 'Zs2D': Zs2D}
 
 
         # --------------------------------------------------------------------------------
@@ -324,7 +325,7 @@ class equilParams:
             # get flux surface average
             for i, psi in enumerate(PSIdict['psiN1D']):
                 jtorSurf = PROFdict['pprime'][i]*FluxSurfList[i]['Rs'] + PROFdict['ffprime'][i]/FluxSurfList[i]['Rs']/mu0
-                f_jtorSurf = eq.interpPeriodic(self.theta[0:-1], jtorSurf[0:-1], copy = False)
+                f_jtorSurf = eq.interpPeriodic(self.theta[0:-1], jtorSurf[0:-1], copy=False)
                 jtor1D[i] = FluxSurfList[i]['FS'].average(f_jtorSurf)
 
             # <jtor> = <R*pprime + ffprime/R/mu0>
@@ -334,11 +335,11 @@ class equilParams:
 
         # --------------------------------------------------------------------------------
         # Flux surface enclosed 2D-Volume (Area inside surface) and derivative (psi)
-        def volume2D(self, FluxSurfList = None):
+        def volume2D(self, FluxSurfList=None):
             V = np.zeros(self.nw)
             psi = self.PSIdict['psiN1D']
 
-            if(FluxSurfList == None):
+            if(FluxSurfList is None):
                 FluxSurfList = self.get_allFluxSur()
 
             for i in xrange(1, self.nw):
