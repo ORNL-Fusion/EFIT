@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import scipy.integrate as integ
 import scipy.interpolate as interp
@@ -7,10 +8,29 @@ import EFIT.equilibrium as eq
 from Misc.deriv import deriv
 #reload(eq)
 
-
 class equilParams:
 
-        def __init__(self, gfileNam, nw=0, nh=0, thetapnts=0, grid2G=True):
+        def __init__(self, gfileNam, nw = 0, nh = 0, thetapnts = 0, grid2G = True, tree = None):
+            #---- get path, shot number and time from file name ----
+            idx = gfileNam[::-1].find('/')  # returns location of last '/' in gfileNam or -1 if not found
+            if(idx == -1):
+                gpath = '.'
+                gfile = gfileNam
+            else:
+                idx *= -1
+                gpath = gfileNam[0:idx - 1] # path without a final '/'
+                gfile = gfileNam[idx::]
+            shot, time = int(gfile[1:7]), int(gfile[9:13])
+            
+            if (not os.path.isfile(gfileNam)) and (tree == None):
+                raise NameError('g-file not found -> Abort!')
+
+            #---- read from MDS+, if keyword tree is given ----
+            if not (tree == None):
+                time = self._read_mds(shot, time, tree = tree, gpath = gpath)			# time needs not be exact, so time could change
+                gfileNam = gpath + '/g' + format(shot,'06d') + '.' + format(time,'05d')	# adjust filename to match time
+            
+            #---- open & read g-file ----
             self.data = gdsk.Geqdsk()
             self.data.openFile(gfileNam)
 
@@ -20,8 +40,8 @@ class equilParams:
                 self.nh = self.data.get('nh')
                 self.thetapnts = 2*self.nh
             else:
-                self.nw = nw
-                self.nh = nh
+                self.nw=nw
+                self.nh=nh
                 self.thetapnts = thetapnts
             self.bcentr = np.abs(self.data.get('bcentr'))
             self.rmaxis = self.data.get('rmaxis')
@@ -29,7 +49,7 @@ class equilParams:
             self.Rmin = self.data.get('rleft')
             self.Rmax = self.Rmin + self.data.get('rdim')
             self.Rbdry = self.data.get('rbbbs').max()
-            self.Rsminor = np.linspace(self.rmaxis, self.Rbdry, self.nw)
+            self.Rsminor = np.linspace(self.rmaxis,self.Rbdry,self.nw)
             self.Zmin = self.data.get('zmid') - self.data.get('zdim')/2.0
             self.Zmax = self.data.get('zmid') + self.data.get('zdim')/2.0
             self.Zlowest = self.data.get('zbbbs').min()
@@ -60,6 +80,21 @@ class equilParams:
             self.BpFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'], self.Bp_2D.T)
             self.BtFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'], self.Bt_2D.T)
 
+            #---- g dict ----                
+            self.g = {'shot': shot, 'time': time, 'NR': self.nw, 'NZ': self.nh,
+                'Xdim': self.data.get('rdim'), 'Zdim': self.data.get('zdim'), 'R0': self.data.get('rcentr'), 
+                'R1': self.data.get('rleft'), 'Zmid': self.data.get('zmid'),
+                'RmAxis': self.rmaxis, 'ZmAxis': self.zmaxis, 'psiAxis': self.siAxis, 'psiSep': self.siBry,
+                'Bt0': self.bcentr, 'Ip': self.data.get('current'),
+                'Fpol': self.PROFdict['fpol'], 'Pres': self.PROFdict['pres'], 'FFprime': self.PROFdict['ffprime'], 
+                'Pprime': self.PROFdict['pprime'], 'qpsi': self.PROFdict['q_prof'], 'q': self.PROFdict['q_prof'],
+                'psiRZ': self.PSIdict['psi2D'], 'R': self.RZdict['Rs1D'], 'Z': self.RZdict['Zs1D'], 
+                'dR': self.RZdict['dR'], 'dZ': self.RZdict['dZ'], 'psiRZn': self.PSIdict['psiN_2D'],
+                'Nlcfs': self.data.get('nbbbs'), 'Nwall': self.data.get('limitr'), 
+                'lcfs': np.vstack((self.data.get('rbbbs'),self.data.get('zbbbs'))).T, 
+                'wall': np.vstack((self.data.get('rlim'),self.data.get('zlim'))).T,
+                'psi': self.PSIdict['psiN1D']}
+
 
         # --------------------------------------------------------------------------------
         # Interpolation function handles for all 1-D fields in the g-file
@@ -89,9 +124,9 @@ class equilParams:
             Rs1D = np.linspace(self.Rmin, self.Rmax, self.nw)
             dZ = (self.Zmax - self.Zmin)/(self.nh - 1)
             Zs1D = np.linspace(self.Zmin, self.Zmax, self.nh)
-            Rs2D, Zs2D = np.meshgrid(Rs1D, Zs1D)
+            Rs2D,Zs2D = np.meshgrid(Rs1D,Zs1D)
 
-            return {'Rs1D': Rs1D, 'dR': dR, 'Zs1D': Zs1D, 'dZ': dZ, 'Rs2D': Rs2D, 'Zs2D': Zs2D}
+            return {'Rs1D':Rs1D,'dR':dR,'Zs1D':Zs1D,'dZ':dZ,'Rs2D':Rs2D,'Zs2D':Zs2D}
 
 
         # --------------------------------------------------------------------------------
@@ -325,7 +360,7 @@ class equilParams:
             # get flux surface average
             for i, psi in enumerate(PSIdict['psiN1D']):
                 jtorSurf = PROFdict['pprime'][i]*FluxSurfList[i]['Rs'] + PROFdict['ffprime'][i]/FluxSurfList[i]['Rs']/mu0
-                f_jtorSurf = eq.interpPeriodic(self.theta[0:-1], jtorSurf[0:-1], copy=False)
+                f_jtorSurf = eq.interpPeriodic(self.theta[0:-1], jtorSurf[0:-1], copy = False)
                 jtor1D[i] = FluxSurfList[i]['FS'].average(f_jtorSurf)
 
             # <jtor> = <R*pprime + ffprime/R/mu0>
@@ -335,11 +370,11 @@ class equilParams:
 
         # --------------------------------------------------------------------------------
         # Flux surface enclosed 2D-Volume (Area inside surface) and derivative (psi)
-        def volume2D(self, FluxSurfList=None):
+        def volume2D(self, FluxSurfList = None):
             V = np.zeros(self.nw)
             psi = self.PSIdict['psiN1D']
 
-            if(FluxSurfList is None):
+            if(FluxSurfList == None):
                 FluxSurfList = self.get_allFluxSur()
 
             for i in xrange(1, self.nw):
@@ -668,3 +703,125 @@ class equilParams:
                 else: xu = x
 
             return x
+                 
+        # --- read_mds -------------------------------------------
+        # reads g-file from MDS+ and writes g-file
+        # Note: MDS+ data is only single precision!
+        # specify shot, time (both as int) and ...
+        #   tree (string)       ->  EFIT tree name, default = 'EFIT01'
+        # further keywords:
+        #   exact (bool)        ->  True: time must match time in EFIT tree, otherwise abort
+        #                           False: EFIT time closest to time is used (default)
+        #   Server (string)     ->  MDS+ server name or IP, default = 'atlas.gat.com' (for DIII-D)
+        #   gpath (string)      ->  path where to save g-file, default = current working dir
+        def _read_mds(self, shot, time, tree = 'EFIT01', exact = False, Server = 'atlas.gat.com', gpath = '.'):
+            import MDSplus
+            print 'Reading shot =', shot, 'and time =', time, 'from MDS+ tree:', tree
+
+            # in case those are passed in as strings
+            shot = int(shot)
+            time = int(time)
+
+            # Connect to server, open tree and go to g-file
+            MDS = MDSplus.Connection(Server)
+            MDS.openTree(tree,shot)
+            base = 'RESULTS:GEQDSK:'
+
+            # get time slice
+            signal = 'GTIME'
+            k = np.argmin(np.abs(MDS.get(base + signal).data() - time))
+            time0 = int(MDS.get(base + signal).data()[k])
+
+            if (time != time0):
+                if exact:
+                    raise RuntimeError(tree + ' does not exactly contain time ' + str(time) + '  ->  Abort')
+                else:
+                    print 'Warning: ' + tree + ' does not exactly contain time ' + str(time) + ' the closest time is ' + str(time0)
+                    print 'Fetching time slice ' + str(time0)
+                    time = time0
+
+            # store data in dictionary
+            g = {'shot':shot, 'time':time}
+
+            # get header line
+            header = MDS.get(base + 'ECASE').data()[k]
+
+            # get all signals, use same names as in read_g_file
+            translate={'MW':'NR', 'MH':'NZ', 'XDIM':'Xdim', 'ZDIM':'Zdim', 'RZERO':'R0',
+                       'RMAXIS':'RmAxis', 'ZMAXIS':'ZmAxis', 'SSIMAG':'psiAxis', 'SSIBRY':'psiSep',
+                       'BCENTR':'Bt0', 'CPASMA':'Ip', 'FPOL':'Fpol', 'PRES':'Pres',
+                       'FFPRIM':'FFprime', 'PPRIME':'Pprime', 'PSIRZ':'psiRZ', 'QPSI':'qpsi',
+                       'NBBBS':'Nlcfs', 'LIMITR':'Nwall'}
+            for signal in translate:
+                g[translate[signal]] = MDS.get(base + signal).data()[k]
+
+            g['R1'] = MDS.get(base + 'RGRID').data()[0]
+            g['Zmid'] = 0.0
+
+            RLIM = MDS.get(base + 'LIM').data()[:,0]
+            ZLIM = MDS.get(base + 'LIM').data()[:,1]
+            g['wall'] = np.vstack((RLIM, ZLIM)).T
+
+            RBBBS = MDS.get(base + 'RBBBS').data()[k][:g['Nlcfs']]
+            ZBBBS = MDS.get(base + 'ZBBBS').data()[k][:g['Nlcfs']]
+            g['lcfs'] = np.vstack((RBBBS, ZBBBS)).T
+
+            KVTOR = 0
+            RVTOR = 1.7
+            NMASS = 0
+            RHOVN = MDS.get(base + 'RHOVN').data()[k]
+
+            # convert floats to integers
+            for item in ['NR', 'NZ', 'Nlcfs', 'Nwall']: g[item] = int(g[item])
+
+            # convert single (float32) to double (float64) and round
+            for item in ['Xdim', 'Zdim', 'R0', 'R1', 'RmAxis', 'ZmAxis', 'psiAxis', 'psiSep', 'Bt0', 'Ip']:
+                g[item] = np.round(np.float64(g[item]), 7)
+
+            # convert single arrays (float32) to double arrays (float64)
+            for item in ['Fpol', 'Pres', 'FFprime', 'Pprime', 'psiRZ', 'qpsi', 'lcfs', 'wall']:
+                g[item] = np.array(g[item], dtype=np.float64)
+
+            # write g-file to disk
+            if not (gpath[-1] == '/'): gpath += '/'
+            with open(gpath + 'g' + format(shot,'06d') + '.' + format(time,'05d'), 'w') as f:
+                if ('EFITD' in header[0]) and (len(header) == 6):
+                    for item in header: f.write(item)
+                else:
+                    f.write('  EFITD    xx/xx/xxxx    #' + str(shot) + '  ' + str(time) + 'ms        ')
+
+                f.write('   3 ' + str(g['NR']) + ' ' + str(g['NZ']) + '\n')
+                f.write('% .9E% .9E% .9E% .9E% .9E\n'%(g['Xdim'], g['Zdim'], g['R0'], g['R1'], g['Zmid']))
+                f.write('% .9E% .9E% .9E% .9E% .9E\n'%(g['RmAxis'], g['ZmAxis'], g['psiAxis'], g['psiSep'], g['Bt0']))
+                f.write('% .9E% .9E% .9E% .9E% .9E\n'%(g['Ip'], 0, 0, 0, 0))
+                f.write('% .9E% .9E% .9E% .9E% .9E\n'%(0,0,0,0,0))
+                self._write_array(g['Fpol'], f)
+                self._write_array(g['Pres'], f)
+                self._write_array(g['FFprime'], f)
+                self._write_array(g['Pprime'], f)
+                self._write_array(g['psiRZ'].flatten(), f)
+                self._write_array(g['qpsi'], f)
+                f.write(str(g['Nlcfs']) + ' ' + str(g['Nwall']) + '\n')
+                self._write_array(g['lcfs'].flatten(), f)
+                self._write_array(g['wall'].flatten(), f)
+                f.write(str(KVTOR) + ' ' + format(RVTOR,' .9E') + ' ' + str(NMASS) + '\n')
+                self._write_array(RHOVN, f)
+            
+            return time
+
+        # --- _write_array -----------------------
+        # write numpy array in format used in g-file:
+        # 5 columns, 9 digit float with exponents and no spaces in front of negative numbers
+        def _write_array(self, x, f):
+            N = len(x)
+            rows = N/5  # integer division
+            rest = N - 5*rows
+
+            for i in xrange(rows):
+                for j in xrange(5): f.write('% .9E'%(x[i*5 + j]))
+                f.write('\n')
+
+            if(rest > 0):
+                for j in xrange(rest): f.write('% .9E'%(x[rows*5 + j]))
+                f.write('\n')
+
