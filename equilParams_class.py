@@ -79,6 +79,8 @@ class equilParams:
             self.psiFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'], self.PSIdict['psiN_2D'].T)
             self.BpFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'], self.Bp_2D.T)
             self.BtFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'], self.Bt_2D.T)
+            self.BRFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'], self.B_R.T)
+            self.BZFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'], self.B_Z.T)
 
             #---- g dict ----                
             self.g = {'shot': shot, 'time': time, 'NR': self.nw, 'NZ': self.nh,
