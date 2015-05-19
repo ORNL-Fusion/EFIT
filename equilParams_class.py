@@ -20,7 +20,9 @@ class equilParams:
                 idx *= -1
                 gpath = gfileNam[0:idx - 1] # path without a final '/'
                 gfile = gfileNam[idx::]
-            shot, time = int(gfile[1:7]), int(gfile[9:13])
+            idx = gfile.find('.')
+            fmtstr = '0' + str(idx-1) + 'd'
+            shot, time = int(gfile[1:idx]), int(gfile[idx+1::])
             
             if (not os.path.isfile(gfileNam)) and (tree == None):
                 raise NameError('g-file not found -> Abort!')
@@ -28,7 +30,7 @@ class equilParams:
             #---- read from MDS+, if keyword tree is given ----
             if not (tree == None):
                 time = self._read_mds(shot, time, tree = tree, gpath = gpath)			# time needs not be exact, so time could change
-                gfileNam = gpath + '/g' + format(shot,'06d') + '.' + format(time,'05d')	# adjust filename to match time
+                gfileNam = gpath + '/g' + format(shot,fmtstr) + '.' + format(time,'05d')	# adjust filename to match time
             
             #---- open & read g-file ----
             self.data = gdsk.Geqdsk()
