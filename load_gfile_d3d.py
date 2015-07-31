@@ -160,7 +160,7 @@ def read_g_file_mds(shot, time, tree = 'EFIT01', exact = False, Server = 'atlas.
 
     # Connect to server, open tree and go to g-file
     MDS = MDSplus.Connection(Server)
-    MDS.openTree(tree,shot)
+    MDS.openTree(tree, shot)
     base = 'RESULTS:GEQDSK:'
 
     # get time slice
