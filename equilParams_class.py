@@ -20,7 +20,9 @@ class equilParams:
                 idx *= -1
                 gpath = gfileNam[0:idx - 1] # path without a final '/'
                 gfile = gfileNam[idx::]
-            shot, time = int(gfile[1:7]), int(gfile[9:13])
+            idx = gfile.find('.')
+            fmtstr = '0' + str(idx-1) + 'd'
+            shot, time = int(gfile[1:idx]), int(gfile[idx+1::])
             
             if (not os.path.isfile(gfileNam)) and (tree == None):
                 raise NameError('g-file not found -> Abort!')
@@ -28,7 +30,7 @@ class equilParams:
             #---- read from MDS+, if keyword tree is given ----
             if not (tree == None):
                 time = self._read_mds(shot, time, tree = tree, gpath = gpath)			# time needs not be exact, so time could change
-                gfileNam = gpath + '/g' + format(shot,'06d') + '.' + format(time,'05d')	# adjust filename to match time
+                gfileNam = gpath + '/g' + format(shot,fmtstr) + '.' + format(time,'05d')	# adjust filename to match time
             
             #---- open & read g-file ----
             self.data = gdsk.Geqdsk()
@@ -470,7 +472,7 @@ class equilParams:
 
             return R, Z
 
-        # ----------------------------------------------------------------------------------------
+        # --------------------------------------------------------------------------------
         def get_j2D(self):
             mu0 = 4*np.pi*1e-7
             jR = np.zeros(self.RZdict['Rs2D'].shape)
@@ -504,9 +506,23 @@ class equilParams:
             return {'R':self.RZdict['Rs2D'], 'Z':self.RZdict['Zs2D'], 'j2D':jtot, 'jpar2D':jpar,
                     'jR2D':jR, 'jZ2D':jZ, 'jtor2D':jtor}
 
+        # --------------------------------------------------------------------------------
+        # --------------------------------------------------------------------------------
+        def _s2psi(self, s, fluxLimit):
+            f_psitor = interp.UnivariateSpline(self.PSIdict['psiN1D'], self.getTorPsi()['psitorN1D'], s = 0)   # EFIT based conversion function
+            y = np.linspace(0,1,1000) * fluxLimit                  # limit normalized poloidal flux to fluxLimit
+            x = f_psitor(y) / f_psitor(fluxLimit)               # x is renormalized (x = 0 -> 1) toroidal flux of psi = 0 -> fluxLimit
+            f_psiN = interp.UnivariateSpline(x, y, s = 0)       # new conversion function, based on x
+            return f_psiN(s)                                    # normalized poloidal flux, matching VMEC s
 
-        # --------------------------------------------------------------------------------
-        # --------------------------------------------------------------------------------
+        def _psi2s(self, psi, fluxLimit):
+            f_psitor = interp.UnivariateSpline(self.PSIdict['psiN1D'], self.getTorPsi()['psitorN1D'], s = 0)   # EFIT based conversion function
+            y = np.linspace(0,1,1000) * fluxLimit                  # limit normalized poloidal flux to fluxLimit
+            x = f_psitor(y) / f_psitor(fluxLimit)               # x is renormalized (x = 0 -> 1) toroidal flux of psi = 0 -> fluxLimit
+            f_s = interp.UnivariateSpline(y, x, s = 0)          # new conversion function, based on y
+            return f_s(psi)                                     # VMEC s, matching normalized poloidal flux
+
+       # --------------------------------------------------------------------------------
         # private functions to locate zero crossings through Newton method or Bisection
         def __comp_newt__(self,psiNVal,theta,rmaxis,zmaxis,psiFunc,r_st = 0.5):
             eps = 1.e-12

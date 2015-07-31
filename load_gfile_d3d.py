@@ -122,7 +122,11 @@ def read_g_file(shot, time, gpath='.'):
 
     dZ = (Zdim/(NZ - 1)).astype(np.min_scalar_type(Zdim/(NZ - 1)))
     NZ2 = int(np.floor(0.5*NZ))
-    Z = Zmid + np.arange(-NZ2, NZ2+1)*dZ
+    if NZ%2 == 0:
+    	Z2 = np.arange(NZ2)*dZ + dZ/2.0
+    	Z = np.append(Zmid - Z2[::-1], Zmid + Z2)
+    else:
+    	Z = Zmid + np.arange(-NZ2, NZ2+1)*dZ
 
     # normalize psiRZ
     psiRZn = (psiRZ - psiAxis) / (psiSep - psiAxis)
