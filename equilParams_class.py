@@ -278,33 +278,33 @@ class equilParams:
             curvNorm_2D = np.ones((self.nw,self.thetapnts))
             curvGeo_2D = np.ones((self.nw,self.thetapnts))
             shear_fl = np.ones((self.nw,self.thetapnts))
-
+            
             if(FluxSurfList == None):
                 FluxSurfList = self.get_allFluxSur()
             if(Bdict == None):
                 Bdict = self.getBs_2D(FluxSurfList)
-
+            
             for i, psiNVal in enumerate(self.PSIdict['psiN1D']):
                 fprint_psiN = self.PROFdict['fpfunc'](psiNVal)*np.ones(self.thetapnts)
-
+                
                 R = FluxSurfList[i]['Rs']
                 Bp = FluxSurfList[i]['Bp']
                 B = FluxSurfList[i]['Bmod']
                 fpol_psiN = FluxSurfList[i]['fpol_psiN']
-
+                
                 kapt1 = (fpol_psiN**2)*(Bdict['dpsidR_2D'][i, :])
                 kapt2 = (Bdict['d2psidR2_2D'][i, :]*Bdict['dpsidZ_2D'][i, :]**2) + ((Bdict['dpsidR_2D'][i, :]**2)*Bdict['d2psidZ2_2D'][i, :])
                 kapt3 = (2*Bdict['dpsidR_2D'][i,:]*Bdict['d2psidRdZ_2D'][i,:]*Bdict['dpsidZ_2D'][i,:])
                 curvNorm_2D[i,:] = (kapt1 + Bdict['Rs_2D'][i,:]*(kapt2-kapt3))/(R**4 * Bp * B**2)
-
+                
                 kap2t1 = Bdict['d2psidRdZ_2D'][i,:]*(Bdict['dpsidR_2D'][i,:]**2 - Bdict['dpsidZ_2D'][i,:]**2)
                 kap2t2 = Bdict['dpsidR_2D'][i,:]*Bdict['dpsidZ_2D'][i,:]*(Bdict['d2psidR2_2D'][i,:] - Bdict['d2psidZ2_2D'][i,:])
                 kap2t3 = Bdict['dpsidZ_2D'][i,:] * R**2 * B**2
                 # curvGeo_2D[i, :] = -1*fpol_psiN*(Bdict['Rs_2D'][i, :]*(kap2t1 - kap2t2 + kap2t3))/(R**5 * Bp * B**3)
                 # maybe no -1 up front?
-                curvGeo_2D[i, :] = fpol_psiN*(Bdict['Rs_2D'][i, :]*(kap2t1 - kap2t2 + kap2t3))/(R**5 * Bp * B**3)
-
-
+                curvGeo_2D[i, :] = fpol_psiN*(Bdict['Rs_2D'][i, :]*(kap2t1 - kap2t2) + kap2t3)/(R**5 * Bp * B**3)
+                
+                
                 coeft1 = fpol_psiN/(R**4 * Bp**2 * B**2)
                 coeft2 = ((Bdict['d2psidR2_2D'][i, :] -
                           Bdict['d2psidZ2_2D'][i, :])*(Bdict['dpsidR_2D'][i, :]**2 -
