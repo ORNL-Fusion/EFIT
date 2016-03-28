@@ -84,7 +84,7 @@ def read_g_file(shot, time, gpath='.'):
             line = split_data(line)  # g-file does not always have blank spaces between data points
             psiRZ.append([float(x) for x in line])
         psiRZ = [num for elem in psiRZ for num in elem]
-        psiRZ = np.array(psiRZ).reshape(NR,NZ)
+        psiRZ = np.array(psiRZ).reshape(NR, NZ)
 
         qpsi = []
         for i in range(0, int(np.ceil(NR/5.0))):
@@ -99,12 +99,12 @@ def read_g_file(shot, time, gpath='.'):
         Nwall = int(head[1])
 
         lcfs = []
-        for i in range(0,int(np.ceil(2*Nlcfs/5.0))):
+        for i in range(0, int(np.ceil(2*Nlcfs/5.0))):
             line = f.readline()
-            line = split_data(line)                 # g-file does not always have blank spaces between data points
+            line = split_data(line)  # g-file does not always have blank spaces between data points
             lcfs.append([float(x) for x in line])
         lcfs = [num for elem in lcfs for num in elem]
-        lcfs = np.array(lcfs).reshape(Nlcfs,2)
+        lcfs = np.array(lcfs).reshape(Nlcfs, 2)
 
         wall = []
         for i in range(0, int(np.ceil(2*Nwall/5.0))):
@@ -122,11 +122,11 @@ def read_g_file(shot, time, gpath='.'):
 
     dZ = (Zdim/(NZ - 1)).astype(np.min_scalar_type(Zdim/(NZ - 1)))
     NZ2 = int(np.floor(0.5*NZ))
-    if NZ%2 == 0:
-    	Z2 = np.arange(NZ2)*dZ + dZ/2.0
-    	Z = np.append(Zmid - Z2[::-1], Zmid + Z2)
+    if NZ % 2 == 0:
+        Z2 = np.arange(NZ2)*dZ + dZ/2.0
+        Z = np.append(Zmid - Z2[::-1], Zmid + Z2)
     else:
-    	Z = Zmid + np.arange(-NZ2, NZ2+1)*dZ
+        Z = Zmid + np.arange(-NZ2, NZ2+1)*dZ
 
     # normalize psiRZ
     psiRZn = (psiRZ - psiAxis) / (psiSep - psiAxis)
@@ -154,7 +154,7 @@ def read_g_file(shot, time, gpath='.'):
 #   write2file (bool)   ->  True: save g-file (default), False: do not write file
 #   gpath (string)      ->  path where to save g-file, default = current working dir
 
-def read_g_file_mds(shot, time, tree = 'EFIT01', exact = False, Server = 'atlas.gat.com',
+def read_g_file_mds(shot, time, tree='EFIT01', exact=False, Server='atlas.gat.com',
                     write2file = True, gpath = '.'):
     import MDSplus
 
@@ -330,6 +330,3 @@ def compare_them(g1, g2):
         x[np.where(x == 0.0)] = 1e-50
         x = x.reshape(g2[item].shape)
         print 'Max. rel. Error in', item, ':', np.max((g1[item] - g2[item])/x)
-
-
-

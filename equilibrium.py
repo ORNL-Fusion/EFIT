@@ -1,11 +1,11 @@
-#
-#
+##
 # Requires the NumPy library
 #
 import math
 import numpy as np
 import copy as cp
-import EFIT.species
+
+import EFIT.species as species
 
 try:
     # erf function available from Python 3.2
@@ -23,12 +23,12 @@ except ImportError:
             x = abs(x)
 
             # constants
-            a1 =  0.254829592
+            a1 = 0.254829592
             a2 = -0.284496736
-            a3 =  1.421413741
+            a3 = 1.421413741
             a4 = -1.453152027
-            a5 =  1.061405429
-            p  =  0.3275911
+            a5 = 1.061405429
+            p = 0.3275911
 
             # A&S formula 7.1.26
             t = 1.0/(1.0 + p*x)
@@ -86,7 +86,7 @@ except ImportError:
 
         s = 2*sp + 4*si + f(a) + f(b)
         return (h/3)*s
-    #print("Using Simpson's rule for integration. Install SciPy for better method")
+    # print("Using Simpson's rule for integration. Install SciPy for better method")
 
 
 class FluxSurface:
@@ -327,7 +327,7 @@ class Equilibrium:
             fm = psi - dpsi
             if fp < 0.:
                 fp = 0.
-            return ( f(fp) - f(fm) ) / (fp - fm) / pnorm
+            return (f(fp) - f(fm)) / (fp - fm) / pnorm
         return dfdpsi
 
     def setDensity(self, dens, psi=None):
@@ -526,9 +526,9 @@ class Equilibrium:
             def surfgen():
                 for i in range(ind0, ind1):
                     f = (self.fix['f(psi)'])[i]
-                    R = (self.fix['R'])[i,:]
-                    Z = (self.fix['Z'])[i,:]
-                    Bp = (self.fix['Bp'])[i,:]
+                    R = (self.fix['R'])[i, :]
+                    Z = (self.fix['Z'])[i, :]
+                    Bp = (self.fix['Bp'])[i, :]
                     f = FluxSurface(f, R, Z, Bp)
                     try:
                         # Try to get profiles
@@ -548,6 +548,7 @@ class Equilibrium:
 
         # No data
         return None
+
 
 class interpPeriodic:
     def __init__(self, x, y, copy=True, period=2.*np.pi):
@@ -569,13 +570,13 @@ class interpPeriodic:
 
         # Simple linear interpolation for now
 
-        im  = (new_ind - 1) % len(self._x)
-        ip  = new_ind
+        im = (new_ind - 1) % len(self._x)
+        ip = new_ind
 
         xm = self._x[im]
         xp = self._x[ip]
 
-        xm    = np.where(xm < xp, xm, xm - self._period)
+        xm = np.where(xm < xp, xm, xm - self._period)
         new_x = np.where(new_x > xp, new_x - self._period, new_x)
 
         ym = self._y[im]
