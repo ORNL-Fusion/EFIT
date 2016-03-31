@@ -6,44 +6,48 @@ import scipy.interpolate as interp
 import EFIT.geqdsk as gdsk
 import EFIT.equilibrium as eq
 from Misc.deriv import deriv
-#reload(eq)
+# reload(eq)
+
 
 class equilParams:
-
-        def __init__(self, gfileNam, nw = 0, nh = 0, thetapnts = 0, grid2G = True, tree = None):
-            #---- get path, shot number and time from file name ----
-            idx = gfileNam[::-1].find('/')  # returns location of last '/' in gfileNam or -1 if not found
+        def __init__(self, gfileNam, nw=0, nh=0, thetapnts=0, grid2G=True, tree=None,
+                     server='atlas.gat.com'):
+            # ---- get path, shot number and time from file name ----
+            # returns location of last '/' in gfileNam or -1 if not found
+            idx = gfileNam[::-1].find('/')
             if(idx == -1):
                 gpath = '.'
                 gfile = gfileNam
             else:
                 idx *= -1
-                gpath = gfileNam[0:idx - 1] # path without a final '/'
+                gpath = gfileNam[0:idx - 1]  # path without a final '/'
                 gfile = gfileNam[idx::]
             idx = gfile.find('.')
             fmtstr = '0' + str(idx-1) + 'd'
             shot, time = int(gfile[1:idx]), int(gfile[idx+1::])
-            
-            if (not os.path.isfile(gfileNam)) and (tree == None):
+
+            if (not os.path.isfile(gfileNam)) and (tree is None):
                 raise NameError('g-file not found -> Abort!')
 
-            #---- read from MDS+, if keyword tree is given ----
-            if not (tree == None):
-                time = self._read_mds(shot, time, tree = tree, gpath = gpath)			# time needs not be exact, so time could change
-                gfileNam = gpath + '/g' + format(shot,fmtstr) + '.' + format(time,'05d')	# adjust filename to match time
-            
-            #---- open & read g-file ----
+            # ---- read from MDS+, if keyword tree is given ----
+            if not (tree is None):
+                # time needs not be exact, so time could change
+                time = self._read_mds(shot, time, tree=tree, gpath=gpath, Server=server)
+                # adjust filename to match time
+                gfileNam = gpath + '/g' + format(shot, fmtstr) + '.' + format(time, '05d')
+
+            # ---- open & read g-file ----
             self.data = gdsk.Geqdsk()
             self.data.openFile(gfileNam)
 
-            #---- Variables ----
+            # ---- Variables ----
             if grid2G:
                 self.nw = self.data.get('nw')
                 self.nh = self.data.get('nh')
-                self.thetapnts = 2*self.nh
+                self.thetapnts = 2 * self.nh
             else:
-                self.nw=nw
-                self.nh=nh
+                self.nw = nw
+                self.nh = nh
                 self.thetapnts = thetapnts
             self.bcentr = np.abs(self.data.get('bcentr'))
             self.rmaxis = self.data.get('rmaxis')
@@ -51,20 +55,21 @@ class equilParams:
             self.Rmin = self.data.get('rleft')
             self.Rmax = self.Rmin + self.data.get('rdim')
             self.Rbdry = self.data.get('rbbbs').max()
-            self.Rsminor = np.linspace(self.rmaxis,self.Rbdry,self.nw)
+            self.Rsminor = np.linspace(self.rmaxis, self.Rbdry, self.nw)
             self.Zmin = self.data.get('zmid') - self.data.get('zdim')/2.0
             self.Zmax = self.data.get('zmid') + self.data.get('zdim')/2.0
             self.Zlowest = self.data.get('zbbbs').min()
             self.siAxis = self.data.get('simag')
             self.siBry = self.data.get('sibry')
 
-            #---- default Functions ----
+            # ---- default Functions ----
             self.PROFdict = self.profiles()
             self.RZdict = self.RZ_params()
             self.PSIdict = self.getPsi()
 
-            #---- more Variables ----
-            self.dpsidZ, self.dpsidR = np.gradient(self.PSIdict['psi2D'], self.RZdict['dZ'], self.RZdict['dR'])
+            # ---- more Variables ----
+            self.dpsidZ, self.dpsidR = np.gradient(self.PSIdict['psi2D'], self.RZdict['dZ'],
+                                                   self.RZdict['dR'])
             self.B_R = self.dpsidZ / self.RZdict['Rs2D']
             self.B_Z = -self.dpsidR / self.RZdict['Rs2D']
             self.Bp_2D = np.sqrt(self.B_R**2 + self.B_Z**2)
@@ -77,49 +82,56 @@ class equilParams:
             Fpol2D = Fpol2D.reshape(self.PSIdict['psiN_2D'].shape)
             self.Bt_2D = Fpol2D / self.RZdict['Rs2D']
 
-            #---- more Functions ----
-            self.psiFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'], self.PSIdict['psiN_2D'].T)
-            self.BpFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'], self.Bp_2D.T)
-            self.BtFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'], self.Bt_2D.T)
-            self.BRFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'], self.B_R.T)
-            self.BZFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'], self.B_Z.T)
+            # ---- more Functions ----
+            self.psiFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'],
+                                                      self.PSIdict['psiN_2D'].T)
+            self.BpFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'],
+                                                     self.Bp_2D.T)
+            self.BtFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'],
+                                                     self.Bt_2D.T)
+            self.BRFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'],
+                                                     self.B_R.T)
+            self.BZFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'],
+                                                     self.B_Z.T)
 
-            #---- g dict ----                
+            # ---- g dict ----
             self.g = {'shot': shot, 'time': time, 'NR': self.nw, 'NZ': self.nh,
-                'Xdim': self.data.get('rdim'), 'Zdim': self.data.get('zdim'), 'R0': self.data.get('rcentr'), 
-                'R1': self.data.get('rleft'), 'Zmid': self.data.get('zmid'),
-                'RmAxis': self.rmaxis, 'ZmAxis': self.zmaxis, 'psiAxis': self.siAxis, 'psiSep': self.siBry,
-                'Bt0': self.bcentr, 'Ip': self.data.get('current'),
-                'Fpol': self.PROFdict['fpol'], 'Pres': self.PROFdict['pres'], 'FFprime': self.PROFdict['ffprime'], 
-                'Pprime': self.PROFdict['pprime'], 'qpsi': self.PROFdict['q_prof'], 'q': self.PROFdict['q_prof'],
-                'psiRZ': self.PSIdict['psi2D'], 'R': self.RZdict['Rs1D'], 'Z': self.RZdict['Zs1D'], 
-                'dR': self.RZdict['dR'], 'dZ': self.RZdict['dZ'], 'psiRZn': self.PSIdict['psiN_2D'],
-                'Nlcfs': self.data.get('nbbbs'), 'Nwall': self.data.get('limitr'), 
-                'lcfs': np.vstack((self.data.get('rbbbs'),self.data.get('zbbbs'))).T, 
-                'wall': np.vstack((self.data.get('rlim'),self.data.get('zlim'))).T,
-                'psi': self.PSIdict['psiN1D']}
-
+                      'Xdim': self.data.get('rdim'), 'Zdim': self.data.get('zdim'),
+                      'R0': self.data.get('rcentr'), 'R1': self.data.get('rleft'),
+                      'Zmid': self.data.get('zmid'), 'RmAxis': self.rmaxis, 'ZmAxis': self.zmaxis,
+                      'psiAxis': self.siAxis, 'psiSep': self.siBry, 'Bt0': self.bcentr,
+                      'Ip': self.data.get('current'), 'Fpol': self.PROFdict['fpol'],
+                      'Pres': self.PROFdict['pres'], 'FFprime': self.PROFdict['ffprime'],
+                      'Pprime': self.PROFdict['pprime'], 'qpsi': self.PROFdict['q_prof'],
+                      'q': self.PROFdict['q_prof'], 'psiRZ': self.PSIdict['psi2D'],
+                      'R': self.RZdict['Rs1D'], 'Z': self.RZdict['Zs1D'], 'dR': self.RZdict['dR'],
+                      'dZ': self.RZdict['dZ'], 'psiRZn': self.PSIdict['psiN_2D'],
+                      'Nlcfs': self.data.get('nbbbs'), 'Nwall': self.data.get('limitr'),
+                      'lcfs': np.vstack((self.data.get('rbbbs'), self.data.get('zbbbs'))).T,
+                      'wall': np.vstack((self.data.get('rlim'), self.data.get('zlim'))).T,
+                      'psi': self.PSIdict['psiN1D']
+                      }
 
         # --------------------------------------------------------------------------------
         # Interpolation function handles for all 1-D fields in the g-file
         def profiles(self):
-            #---- Profiles ----
+            # ---- Profiles ----
             fpol = self.data.get('fpol')
-            ffunc = interp.UnivariateSpline(np.linspace(0.,1.,np.size(fpol)),fpol,s=0)
+            ffunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(fpol)), fpol, s=0)
             fprime = self.data.get('ffprime')/fpol
-            fpfunc = interp.UnivariateSpline(np.linspace(0.,1.,np.size(fprime)),fprime,s=0)
+            fpfunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(fprime)), fprime, s=0)
             ffprime = self.data.get('ffprime')
-            ffpfunc = interp.UnivariateSpline(np.linspace(0.,1.,np.size(ffprime)),ffprime,s=0)
+            ffpfunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(ffprime)), ffprime, s=0)
             pprime = self.data.get('pprime')
-            ppfunc = interp.UnivariateSpline(np.linspace(0.,1.,np.size(pprime)),pprime,s=0)
+            ppfunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(pprime)), pprime, s=0)
             pres = self.data.get('pres')
-            pfunc = interp.UnivariateSpline(np.linspace(0.,1.,np.size(pres)),pres,s=0)
+            pfunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(pres)), pres, s=0)
             q_prof = self.data.get('qpsi')
-            qfunc = interp.UnivariateSpline(np.linspace(0.,1.,np.size(q_prof)),q_prof,s=0)
+            qfunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(q_prof)), q_prof, s=0)
 
-            return {'fpol':fpol,'ffunc':ffunc,'fprime':fprime,'fpfunc':fpfunc,'ffprime':ffprime,'ffpfunc':ffpfunc,
-                        'pprime':pprime,'ppfunc':ppfunc,'pres':pres,'pfunc':pfunc,'q_prof':q_prof,'qfunc':qfunc}
-
+            return {'fpol': fpol, 'ffunc': ffunc, 'fprime': fprime, 'fpfunc': fpfunc,
+                    'ffprime': ffprime, 'ffpfunc': ffpfunc, 'pprime': pprime, 'ppfunc': ppfunc,
+                    'pres': pres, 'pfunc': pfunc, 'q_prof': q_prof, 'qfunc': qfunc}
 
         # --------------------------------------------------------------------------------
         # 1-D and 2-D (R,Z) grid
@@ -128,85 +140,79 @@ class equilParams:
             Rs1D = np.linspace(self.Rmin, self.Rmax, self.nw)
             dZ = (self.Zmax - self.Zmin)/(self.nh - 1)
             Zs1D = np.linspace(self.Zmin, self.Zmax, self.nh)
-            Rs2D,Zs2D = np.meshgrid(Rs1D,Zs1D)
-
-            return {'Rs1D':Rs1D,'dR':dR,'Zs1D':Zs1D,'dZ':dZ,'Rs2D':Rs2D,'Zs2D':Zs2D}
-
+            Rs2D, Zs2D = np.meshgrid(Rs1D, Zs1D)
+            return {'Rs1D': Rs1D, 'dR': dR, 'Zs1D': Zs1D, 'dZ': dZ, 'Rs2D': Rs2D, 'Zs2D': Zs2D}
 
         # --------------------------------------------------------------------------------
         # 1-D and 2-D poloidal flux, normalized and regular
-        # compared to the integral definition of psipol (psipol = 2pi integral_Raxis^Rsurf(Bpol * R * dR))
+        # compared to the integral definition of psipol
+        # (psipol = 2pi integral_Raxis^Rsurf(Bpol * R * dR))
         # regular is shifted by self.siAxis and missing the factor 2*pi !!!
         # so: psipol = psi1D = 2pi * (self.siBry-self.siAxis) * psiN1D
         def getPsi(self):
-            psiN1D = np.linspace(0.0 ,1.0, self.nw)
+            psiN1D = np.linspace(0.0, 1.0, self.nw)
             psi1D = 2*np.pi * (self.siBry - self.siAxis) * psiN1D
             psi2D = self.data.get('psirz')
             psiN_2D = (psi2D - self.siAxis) / (self.siBry - self.siAxis)
             # psiN_2D[np.where(psiN_2D > 1.2)] = 1.2
-
-            return {'psi2D':psi2D,'psiN_2D':psiN_2D,'psi1D':psi1D,'psiN1D':psiN1D}
-
+            return {'psi2D': psi2D, 'psiN_2D': psiN_2D, 'psi1D': psi1D, 'psiN1D': psiN1D}
 
         # --------------------------------------------------------------------------------
         # 1-D normalized toroidal flux
         # dpsitor/dpsipol = q  ->  psitor = integral(q(psipol) * dpsipol)
         # dummy input variable for backward compatability <-> this input is unused!!!
-        def getTorPsi(self, dummy = None):
+        def getTorPsi(self, dummy=None):
             dpsi = (self.siBry - self.siAxis)/(self.nw - 1) * 2*np.pi
-            hold = integ.cumtrapz(self.PROFdict['q_prof'], dx = dpsi) * np.sign(self.data.get('bcentr'))
+            hold = integ.cumtrapz(self.PROFdict['q_prof'], dx=dpsi) * np.sign(self.data.get('bcentr'))
             psitor = np.append(0, hold)
             psitorN1D = (psitor - psitor[0])/(psitor[-1] - psitor[0])
-
-            return {'psitorN1D':psitorN1D, 'psitor1D':psitor}
-
+            return {'psitorN1D': psitorN1D, 'psitor1D': psitor}
 
         # --------------------------------------------------------------------------------
         # (R,Z) and B-fields on a single flux surface
-        def getBs_FluxSur(self,psiNVal):
+        def getBs_FluxSur(self, psiNVal):
             R_hold = np.ones(self.thetapnts)
             Z_hold = np.ones(self.thetapnts)
-
             for thet in enumerate(self.theta):
                 try:
-                    Rneu, Zneu = self.__comp_newt__(psiNVal,thet[1],self.rmaxis,self.zmaxis,self.psiFunc)
+                    Rneu, Zneu = self.__comp_newt__(psiNVal, thet[1], self.rmaxis, self.zmaxis,
+                                                    self.psiFunc)
                 except RuntimeError:
-                    Rneu, Zneu = self.__comp_bisec__(psiNVal,thet[1],self.rmaxis,self.zmaxis,self.Zlowest,self.psiFunc)
+                    Rneu, Zneu = self.__comp_bisec__(psiNVal, thet[1], self.rmaxis, self.zmaxis,
+                                                     self.Zlowest, self.psiFunc)
                 R_hold[thet[0]] = Rneu
                 Z_hold[thet[0]] = Zneu
 
             Bp_hold = self.BpFunc.ev(R_hold, Z_hold)
             fpol_psiN = self.PROFdict['ffunc'](psiNVal)*np.ones(np.size(Bp_hold))
-            fluxSur = eq.FluxSurface(fpol_psiN[0:-1], R_hold[0:-1], Z_hold[0:-1], Bp_hold[0:-1], self.theta[0:-1])
+            fluxSur = eq.FluxSurface(fpol_psiN[0:-1], R_hold[0:-1], Z_hold[0:-1], Bp_hold[0:-1],
+                                     self.theta[0:-1])
             Bt_hold = np.append(fluxSur._Bt, fluxSur._Bt[0])    # add last point = first point
             Bmod = np.append(fluxSur._B, fluxSur._B[0])         # add last point = first point
-
-            return {'Rs':R_hold, 'Zs':Z_hold, 'Bp':Bp_hold, 'Bt':Bt_hold, 'Bmod':Bmod,
-                    'fpol_psiN':fpol_psiN, 'FS':fluxSur}
-
+            return {'Rs': R_hold, 'Zs': Z_hold, 'Bp': Bp_hold, 'Bt': Bt_hold, 'Bmod': Bmod,
+                    'fpol_psiN': fpol_psiN, 'FS': fluxSur}
 
         # --------------------------------------------------------------------------------
         # Shaping of a single flux surface
-        def get_FluxShape(self,psiNVal):
+        def get_FluxShape(self, psiNVal):
             FluxSur = self.getBs_FluxSur(psiNVal)
 
-            b= (FluxSur['Zs'].max()-FluxSur['Zs'].min())/2
-            a= (FluxSur['Rs'].max()-FluxSur['Rs'].min())/2
+            b = (FluxSur['Zs'].max()-FluxSur['Zs'].min())/2
+            a = (FluxSur['Rs'].max()-FluxSur['Rs'].min())/2
             d = (FluxSur['Rs'].min()+a) - FluxSur['Rs'][np.where(FluxSur['Zs'] == FluxSur['Zs'].max())]
             c = (FluxSur['Rs'].min()+a) - FluxSur['Rs'][np.where(FluxSur['Zs'] == FluxSur['Zs'].min())]
 
-            return {'kappa':(b/a),'tri_avg':(c+d)/2/a,'triUP':(d/a),'triLO':(c/a)}
-
+            return {'kappa': (b/a), 'tri_avg': (c+d)/2/a, 'triUP': (d/a), 'triLO': (c/a)}
 
         # --------------------------------------------------------------------------------
         # (R,Z) and B-fields for all flux surfaces given by 1-D normalized poloidal flux array psiN1D
         def get_allFluxSur(self):
             FluxSurList = []
-            R,Z = self.__get_RZ__(self.theta, self.PSIdict['psiN1D'], quiet = True)
+            R, Z = self.__get_RZ__(self.theta, self.PSIdict['psiN1D'], quiet=True)
 
             for i, psiNVal in enumerate(self.PSIdict['psiN1D']):
-                R_hold = R[i,:]
-                Z_hold = Z[i,:]
+                R_hold = R[i, :]
+                Z_hold = Z[i, :]
 
                 Bp_hold = self.BpFunc.ev(R_hold, Z_hold)
                 fpol_psiN = self.PROFdict['fpol'][i] * np.ones(self.thetapnts)
@@ -278,41 +284,41 @@ class equilParams:
             curvNorm_2D = np.ones((self.nw,self.thetapnts))
             curvGeo_2D = np.ones((self.nw,self.thetapnts))
             shear_fl = np.ones((self.nw,self.thetapnts))
-            
+
             if(FluxSurfList == None):
                 FluxSurfList = self.get_allFluxSur()
             if(Bdict == None):
                 Bdict = self.getBs_2D(FluxSurfList)
-            
+
             for i, psiNVal in enumerate(self.PSIdict['psiN1D']):
                 fprint_psiN = self.PROFdict['fpfunc'](psiNVal)*np.ones(self.thetapnts)
-                
+
                 R = FluxSurfList[i]['Rs']
                 Bp = FluxSurfList[i]['Bp']
                 B = FluxSurfList[i]['Bmod']
                 fpol_psiN = FluxSurfList[i]['fpol_psiN']
-                
+
                 kapt1 = (fpol_psiN**2)*(Bdict['dpsidR_2D'][i, :])
                 kapt2 = (Bdict['d2psidR2_2D'][i, :]*Bdict['dpsidZ_2D'][i, :]**2) + ((Bdict['dpsidR_2D'][i, :]**2)*Bdict['d2psidZ2_2D'][i, :])
                 kapt3 = (2*Bdict['dpsidR_2D'][i,:]*Bdict['d2psidRdZ_2D'][i,:]*Bdict['dpsidZ_2D'][i,:])
                 curvNorm_2D[i,:] = (kapt1 + Bdict['Rs_2D'][i,:]*(kapt2-kapt3))/(R**4 * Bp * B**2)
-                
+
                 kap2t1 = Bdict['d2psidRdZ_2D'][i,:]*(Bdict['dpsidR_2D'][i,:]**2 - Bdict['dpsidZ_2D'][i,:]**2)
                 kap2t2 = Bdict['dpsidR_2D'][i,:]*Bdict['dpsidZ_2D'][i,:]*(Bdict['d2psidR2_2D'][i,:] - Bdict['d2psidZ2_2D'][i,:])
                 kap2t3 = Bdict['dpsidZ_2D'][i,:] * R**2 * B**2
                 # curvGeo_2D[i, :] = -1*fpol_psiN*(Bdict['Rs_2D'][i, :]*(kap2t1 - kap2t2 + kap2t3))/(R**5 * Bp * B**3)
                 # maybe no -1 up front?
                 curvGeo_2D[i, :] = fpol_psiN*(Bdict['Rs_2D'][i, :]*(kap2t1 - kap2t2) + kap2t3)/(R**5 * Bp * B**3)
-                
-                
-                coeft1 = fpol_psiN/(R**4 * Bp**2 * B**2)
+
+
+                coeft1 = fpol_psiN / (R**4 * Bp**2 * B**2)
                 coeft2 = ((Bdict['d2psidR2_2D'][i, :] -
-                          Bdict['d2psidZ2_2D'][i, :])*(Bdict['dpsidR_2D'][i, :]**2 -
+                          Bdict['d2psidZ2_2D'][i, :]) * (Bdict['dpsidR_2D'][i, :]**2 -
                           Bdict['dpsidZ_2D'][i, :]**2) +
-                            (4*Bdict['dpsidR_2D'][i,:]*Bdict['d2psidRdZ_2D'][i,:]*Bdict['dpsidZ_2D'][i,:]))
-                sht2 = fpol_psiN*Bdict['dpsidR_2D'][i,:]/(R**3 * B**2)
-                sht3 = fprint_psiN*Bp**2/(B**2)
-                shear_fl[i, :] = (coeft1*coeft2 + sht2 - sht3)
+                            (4*Bdict['dpsidR_2D'][i,:] * Bdict['d2psidRdZ_2D'][i,:] * Bdict['dpsidZ_2D'][i,:]))
+                sht2 = fpol_psiN * Bdict['dpsidR_2D'][i,:] / (R**3 * B**2)
+                sht3 = fprint_psiN * Bp**2 / (B**2)
+                shear_fl[i, :] = coeft1 * coeft2 + sht2 - sht3
 
             return {'curvNorm_2D': curvNorm_2D, 'curvGeo_2D': curvGeo_2D,
                     'localShear_2D': shear_fl, 'Rs_2D': Bdict['Rs_2D'], 'Zs_2D': Bdict['Zs_2D']}
@@ -443,13 +449,12 @@ class equilParams:
 
             return paramDICT
 
-
         # --------------------------------------------------------------------------------
         # returns arrays R and Z of N points along psi = const. surface
-        def flux_surface(self, psi0, N, theta = None):
-            if(theta == None):
-                theta = np.linspace(0,2*np.pi,N + 1)[0:-1]
-            else :
+        def flux_surface(self, psi0, N, theta=None):
+            if (theta is None):
+                theta = np.linspace(0, 2*np.pi, N + 1)[0:-1]
+            else:
                 N = len(theta)
 
             r = np.zeros(theta.shape)
@@ -465,7 +470,7 @@ class equilParams:
 
             # iterate
             for i in xrange(N):
-                r[i] = self.__bisec__(psi0, theta[i], b = rmax)
+                r[i] = self.__bisec__(psi0, theta[i], b=rmax)
 
             R = r*np.cos(theta) + self.rmaxis
             Z = r*np.sin(theta) + self.zmaxis
@@ -480,12 +485,12 @@ class equilParams:
             jtor = np.zeros(self.RZdict['Rs2D'].shape)
 
             for i in xrange(self.nw):
-                jR[:,i] = -deriv(self.Bt_2D[:,i], self.RZdict['Zs2D'][:,i])
-                jtor[:,i] = deriv(self.B_R[:,i], self.RZdict['Zs2D'][:,i])
+                jR[:, i] = -deriv(self.Bt_2D[:, i], self.RZdict['Zs2D'][:, i])
+                jtor[:, i] = deriv(self.B_R[:, i], self.RZdict['Zs2D'][:, i])
 
             for i in xrange(self.nh):
-                jZ[i,:] = deriv(self.Bt_2D[i,:], self.RZdict['Rs2D'][i,:])
-                jtor[i,:] -= deriv(self.B_Z[i,:], self.RZdict['Rs2D'][i,:])
+                jZ[i, :] = deriv(self.Bt_2D[i, :], self.RZdict['Rs2D'][i, :])
+                jtor[i, :] -= deriv(self.B_Z[i, :], self.RZdict['Rs2D'][i, :])
 
             jZ += self.Bt_2D/self.RZdict['Rs2D']
 
@@ -509,7 +514,7 @@ class equilParams:
         # --------------------------------------------------------------------------------
         # --------------------------------------------------------------------------------
         def _s2psi(self, s, fluxLimit):
-            f_psitor = interp.UnivariateSpline(self.PSIdict['psiN1D'], self.getTorPsi()['psitorN1D'], s = 0)   # EFIT based conversion function
+            f_psitor = interp.UnivariateSpline(self.PSIdict['psiN1D'], self.getTorPsi()['psitorN1D'], s=0)   # EFIT based conversion function
             y = np.linspace(0,1,1000) * fluxLimit                  # limit normalized poloidal flux to fluxLimit
             x = f_psitor(y) / f_psitor(fluxLimit)               # x is renormalized (x = 0 -> 1) toroidal flux of psi = 0 -> fluxLimit
             f_psiN = interp.UnivariateSpline(x, y, s = 0)       # new conversion function, based on x
@@ -677,17 +682,14 @@ class equilParams:
                 if(Rm < 0): theta += np.pi;
                 if((Rm >= 0) & (Zm < 0)): theta += 2*np.pi;
 
-            return theta;
-
+            return theta
 
         # --------------------------------------------------------------------------------
         # get minor radius from (R,Z) coordinates
         def __get_r__(self, R, Z):
-            Rm = R - self.rmaxis # R relative to magnetic axis
-            Zm = Z - self.zmaxis # Z relative to magnetic axis
-
-            return np.sqrt(Rm*Rm + Zm*Zm);
-
+            Rm = R - self.rmaxis  # R relative to magnetic axis
+            Zm = Z - self.zmaxis  # Z relative to magnetic axis
+            return np.sqrt(Rm*Rm + Zm*Zm)
 
         # --------------------------------------------------------------------------------
         # get f(r) = psi(R(theta,r),Z(theta,r))-psi0 with theta = const.
@@ -698,10 +700,9 @@ class equilParams:
             f = psi - psi0
             return f
 
-
         # --------------------------------------------------------------------------------
         # get r for theta = const. and psi = psi0
-        def __bisec__(self, psi0, theta, a = 0, b = 1.5):
+        def __bisec__(self, psi0, theta, a=0, b=1.5):
             eps = 1e-14
 
             x = a
@@ -717,11 +718,13 @@ class equilParams:
             while(abs(xo-xu) > eps):
                 x = (xo + xu)/2.0
                 f = self.__funct__(x, theta, psi0)
-                if(f > 0): xo = x
-                else: xu = x
+                if(f > 0):
+                    xo = x
+                else:
+                    xu = x
 
             return x
-                 
+
         # --- read_mds -------------------------------------------
         # reads g-file from MDS+ and writes g-file
         # Note: MDS+ data is only single precision!
@@ -732,7 +735,8 @@ class equilParams:
         #                           False: EFIT time closest to time is used (default)
         #   Server (string)     ->  MDS+ server name or IP, default = 'atlas.gat.com' (for DIII-D)
         #   gpath (string)      ->  path where to save g-file, default = current working dir
-        def _read_mds(self, shot, time, tree = 'EFIT01', exact = False, Server = 'atlas.gat.com', gpath = '.'):
+        def _read_mds(self, shot, time, tree='EFIT01', exact=False, Server='atlas.gat.com',
+                      gpath='.'):
             import MDSplus
             print 'Reading shot =', shot, 'and time =', time, 'from MDS+ tree:', tree
 
@@ -742,7 +746,7 @@ class equilParams:
 
             # Connect to server, open tree and go to g-file
             MDS = MDSplus.Connection(Server)
-            MDS.openTree(tree,shot)
+            MDS.openTree(tree, shot)
             base = 'RESULTS:GEQDSK:'
 
             # get time slice
@@ -765,19 +769,19 @@ class equilParams:
             header = MDS.get(base + 'ECASE').data()[k]
 
             # get all signals, use same names as in read_g_file
-            translate={'MW':'NR', 'MH':'NZ', 'XDIM':'Xdim', 'ZDIM':'Zdim', 'RZERO':'R0',
-                       'RMAXIS':'RmAxis', 'ZMAXIS':'ZmAxis', 'SSIMAG':'psiAxis', 'SSIBRY':'psiSep',
-                       'BCENTR':'Bt0', 'CPASMA':'Ip', 'FPOL':'Fpol', 'PRES':'Pres',
-                       'FFPRIM':'FFprime', 'PPRIME':'Pprime', 'PSIRZ':'psiRZ', 'QPSI':'qpsi',
-                       'NBBBS':'Nlcfs', 'LIMITR':'Nwall'}
+            translate = {'MW': 'NR', 'MH': 'NZ', 'XDIM': 'Xdim', 'ZDIM': 'Zdim', 'RZERO': 'R0',
+                         'RMAXIS': 'RmAxis', 'ZMAXIS': 'ZmAxis', 'SSIMAG': 'psiAxis',
+                         'SSIBRY': 'psiSep', 'BCENTR': 'Bt0', 'CPASMA': 'Ip', 'FPOL': 'Fpol',
+                         'PRES': 'Pres', 'FFPRIM': 'FFprime', 'PPRIME': 'Pprime', 'PSIRZ': 'psiRZ',
+                         'QPSI': 'qpsi', 'NBBBS': 'Nlcfs', 'LIMITR': 'Nwall'}
             for signal in translate:
                 g[translate[signal]] = MDS.get(base + signal).data()[k]
 
             g['R1'] = MDS.get(base + 'RGRID').data()[0]
             g['Zmid'] = 0.0
 
-            RLIM = MDS.get(base + 'LIM').data()[:,0]
-            ZLIM = MDS.get(base + 'LIM').data()[:,1]
+            RLIM = MDS.get(base + 'LIM').data()[:, 0]
+            ZLIM = MDS.get(base + 'LIM').data()[:, 1]
             g['wall'] = np.vstack((RLIM, ZLIM)).T
 
             RBBBS = MDS.get(base + 'RBBBS').data()[k][:g['Nlcfs']]
@@ -790,10 +794,12 @@ class equilParams:
             RHOVN = MDS.get(base + 'RHOVN').data()[k]
 
             # convert floats to integers
-            for item in ['NR', 'NZ', 'Nlcfs', 'Nwall']: g[item] = int(g[item])
+            for item in ['NR', 'NZ', 'Nlcfs', 'Nwall']:
+                g[item] = int(g[item])
 
             # convert single (float32) to double (float64) and round
-            for item in ['Xdim', 'Zdim', 'R0', 'R1', 'RmAxis', 'ZmAxis', 'psiAxis', 'psiSep', 'Bt0', 'Ip']:
+            for item in ['Xdim', 'Zdim', 'R0', 'R1', 'RmAxis', 'ZmAxis', 'psiAxis', 'psiSep',
+                         'Bt0', 'Ip']:
                 g[item] = np.round(np.float64(g[item]), 7)
 
             # convert single arrays (float32) to double arrays (float64)
@@ -801,8 +807,9 @@ class equilParams:
                 g[item] = np.array(g[item], dtype=np.float64)
 
             # write g-file to disk
-            if not (gpath[-1] == '/'): gpath += '/'
-            with open(gpath + 'g' + format(shot,'06d') + '.' + format(time,'05d'), 'w') as f:
+            if not (gpath[-1] == '/'):
+                gpath += '/'
+            with open(gpath + 'g' + format(shot, '06d') + '.' + format(time,'05d'), 'w') as f:
                 if ('EFITD' in header[0]) and (len(header) == 6):
                     for item in header: f.write(item)
                 else:
@@ -822,9 +829,9 @@ class equilParams:
                 f.write(str(g['Nlcfs']) + ' ' + str(g['Nwall']) + '\n')
                 self._write_array(g['lcfs'].flatten(), f)
                 self._write_array(g['wall'].flatten(), f)
-                f.write(str(KVTOR) + ' ' + format(RVTOR,' .9E') + ' ' + str(NMASS) + '\n')
+                f.write(str(KVTOR) + ' ' + format(RVTOR, ' .9E') + ' ' + str(NMASS) + '\n')
                 self._write_array(RHOVN, f)
-            
+
             return time
 
         # --- _write_array -----------------------
@@ -836,10 +843,11 @@ class equilParams:
             rest = N - 5*rows
 
             for i in xrange(rows):
-                for j in xrange(5): f.write('% .9E'%(x[i*5 + j]))
+                for j in xrange(5):
+                        f.write('% .9E' % (x[i*5 + j]))
                 f.write('\n')
 
             if(rest > 0):
-                for j in xrange(rest): f.write('% .9E'%(x[rows*5 + j]))
+                for j in xrange(rest):
+                        f.write('% .9E' % (x[rows*5 + j]))
                 f.write('\n')
-

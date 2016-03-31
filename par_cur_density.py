@@ -27,10 +27,10 @@ def get_currs(gfileNam,nw=0,nh=0,thetapnts=0,grid2G=0):
 	Zmin = data.get('zmid') - data.get('zdim')/2.0
 	Zmax = data.get('zmid') + data.get('zdim')/2.0
 	Zlowest = data.get('zbbbs').min()
-	
+
 	siAxis = data.get('simag')
 	siBry = data.get('sibry')
-	
+
 	#---- Profiles ----
 	fpol = data.get('fpol')
 	ffunc = interp.UnivariateSpline(np.linspace(0.,1.,np.size(fpol)),fpol,s=0)
@@ -44,38 +44,38 @@ def get_currs(gfileNam,nw=0,nh=0,thetapnts=0,grid2G=0):
 	pfunc = interp.UnivariateSpline(np.linspace(0.,1.,np.size(pres)),pres,s=0)
 	q_prof = data.get('qpsi')
 	qfunc = interp.UnivariateSpline(np.linspace(0.,1.,np.size(q_prof)),q_prof,s=0)
-	
+
 	g_psi2D = data.get('psirz')
-	
+
 	psiN1D = np.linspace(0.0,1.0,nw)
 	Rsminor = np.linspace(rmaxis,Rbdry,nw)
-	
+
 	dR = (Rmax - Rmin)/float(nw - 1)
 	Rs1D = np.arange(Rmin, Rmax*(1.+1.e-10), dR)
-	
+
 	dZ = (Zmax - Zmin)/float(nh - 1)
 	Zs1D = np.arange(Zmin, Zmax*(1.+1.e-10), dZ)
-	
+
 	gRs,gZs = np.meshgrid(np.linspace(Rmin,Rmax,g_psi2D.shape[1]),np.linspace(Zmin,Zmax,g_psi2D.shape[0]))
 	psi2D = interp.griddata((gRs.flatten(0),gZs.flatten(0)),g_psi2D.flatten(0),(Rs1D[None,:],Zs1D[:,None]),method='cubic',fill_value=0.0)
-	
+
 	Bp_R,Bp_Z = np.gradient(psi2D,dR,dZ)
-	
+
 	Rs2D,Zs2D = np.meshgrid(Rs1D,Zs1D)
 	Bp_2D = np.sqrt(Bp_R**2 + Bp_Z**2)/Rs2D
-	
+
 	psiN_2D = (psi2D - siAxis)/(siBry-siAxis)
 	psiN_2D[np.where(psiN_2D > 1.2)] = 1.2
-	
+
 	theta = np.linspace(0.0,2.*np.pi,thetapnts)
 	Bsqrd = np.copy(psiN1D)
 	R_hold = np.copy(theta)
 	Z_hold = np.copy(theta)
 	Bp_hold = np.copy(theta)
-	
+
 	psiFunc = interp.RectBivariateSpline(Rs1D,Zs1D,psiN_2D.T,kx=1,ky=1)
 	BpFunc = interp.RectBivariateSpline(Rs1D,Zs1D,Bp_2D.T,kx=1,ky=1)
-	
+
 	for i in enumerate(psiN1D):
 		psiNVal = i[1]
 		for thet in enumerate(theta):
@@ -89,20 +89,20 @@ def get_currs(gfileNam,nw=0,nh=0,thetapnts=0,grid2G=0):
 		fpol_psiN = ffunc(psiNVal)*np.ones(np.size(Bp_hold))
 		fluxSur = eq.FluxSurface(fpol_psiN,R_hold,Z_hold,Bp_hold)
 		Bsqrd[i[0]] = fluxSur.Bsqav()
-	
+
 	# parallel current calc
 	# jpar = J (dot) B = fprime*B^2/mu0 + pprime*fpol
 	jpar = (fpfunc(psiN1D)*Bsqrd/mu0 +ppfunc(psiN1D)*ffunc(psiN1D))/bcentr/1e6
-	
+
 	#jtor [A/m**2] = R*pprime +ffprime/R/mu0
 	jtor = np.abs(Rsminor*ppfunc(psiN1D) +(ffpfunc(psiN1D)/Rsminor/mu0))/1.e6
-	
+
 	curDICT={}
 	curDICT['jpar']=jpar
 	curDICT['jtor']=jtor
 	curDICT['psiN']=psiN1D
 	return curDICT
-	
+
 #figure();plot(psiN1D,jpar);axis([0.0,1,0,2]);
 
 def comp_newt(psiNVal,theta,rmaxis,zmaxis,psiFunc,r_st = 0.5):
