@@ -498,7 +498,7 @@ class equilParams:
             jZ /= mu0
             jtor /= mu0
 
-            idx = np.where((self.PSIdict['psiN_2D'] > 1.0) | (abs(self.RZdict['Zs2D']) > 1.3))
+            idx = np.where((self.PSIdict['psiN_2D'] > 1.0) | (abs(self.RZdict['Zs2D']) > abs(self.data.get('zbbbs')).max()))
             jR[idx] = 0
             jZ[idx] = 0
             jtor[idx] = 0
