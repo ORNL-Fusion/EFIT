@@ -361,7 +361,7 @@ class Equilibrium:
             try:
                 val = dens[0]
                 p = psi
-                if p == None:
+                if p is None:
                     p = np.linspace(0.0, 1.0, num=len(dens), endpoint=False)
                 densfunc = interp1d(p, dens)
             except:
@@ -414,7 +414,7 @@ class Equilibrium:
             try:
                 val = T[0]
                 p = psi
-                if p == None:
+                if p is None:
                     p = np.linspace(0.0, 1.0, num=len(T), endpoint=False)
                 Tfunc = interp1d(p, T)
             except:

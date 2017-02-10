@@ -23,7 +23,7 @@ class Species:
         self.dTdpsi = dTdpsi
         self.density = n
         self.dndpsi = dndpsi
-        if AA == None:
+        if AA is None:
             self.atomicMass = 1./1860.  # Electron mass in atomic mass units
             self.unitCharge = -1      # Charge in elementary charge units
         else:

@@ -285,9 +285,9 @@ class equilParams:
             curvGeo_2D = np.ones((self.nw,self.thetapnts))
             shear_fl = np.ones((self.nw,self.thetapnts))
 
-            if(FluxSurfList == None):
+            if(FluxSurfList is None):
                 FluxSurfList = self.get_allFluxSur()
-            if(Bdict == None):
+            if(Bdict is None):
                 Bdict = self.getBs_2D(FluxSurfList)
 
             for i, psiNVal in enumerate(self.PSIdict['psiN1D']):
@@ -384,7 +384,7 @@ class equilParams:
             V = np.zeros(self.nw)
             psi = self.PSIdict['psiN1D']
 
-            if(FluxSurfList == None):
+            if(FluxSurfList is None):
                 FluxSurfList = self.get_allFluxSur()
 
             for i in xrange(1, self.nw):
