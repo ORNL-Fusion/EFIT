@@ -671,8 +671,12 @@ class equilParams:
             Rm = R - self.rmaxis # R relative to magnetic axis
             Zm = Z - self.zmaxis # Z relative to magnetic axis
 
-            Rm[(Rm < 1e-16) & (Rm >= 0)] = 1e-16
-            Rm[(Rm > -1e-16) & (Rm < 0)] = -1e-16
+            if isinstance(Rm, np.ndarray):
+                Rm[(Rm < 1e-16) & (Rm >= 0)] = 1e-16
+                Rm[(Rm > -1e-16) & (Rm < 0)] = -1e-16
+            else:
+                if (Rm < 1e-16) & (Rm >= 0): Rm = 1e-16
+                if (Rm > -1e-16) & (Rm < 0): Rm = -1e-16
 
             theta = np.arctan(Zm/Rm);
             if isinstance(theta, np.ndarray):
