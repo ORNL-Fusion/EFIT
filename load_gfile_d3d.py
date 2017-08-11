@@ -202,8 +202,8 @@ def read_g_file_mds(shot, time, tree='EFIT01', exact=False, Server='atlas.gat.co
     ZLIM = MDS.get(base + 'LIM').data()[:,1]
     g['wall'] = np.vstack((RLIM, ZLIM)).T
 
-    RBBBS = MDS.get(base + 'RBBBS').data()[k][:g['Nlcfs']]
-    ZBBBS = MDS.get(base + 'ZBBBS').data()[k][:g['Nlcfs']]
+    RBBBS = MDS.get(base + 'RBBBS').data()[k][:int(g['Nlcfs'])]
+    ZBBBS = MDS.get(base + 'ZBBBS').data()[k][:int(g['Nlcfs'])]
     g['lcfs'] = np.vstack((RBBBS, ZBBBS)).T
 
     KVTOR = 0
