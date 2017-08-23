@@ -155,7 +155,7 @@ def read_g_file(shot, time, gpath='.'):
 #   gpath (string)      ->  path where to save g-file, default = current working dir
 
 def read_g_file_mds(shot, time, tree='EFIT01', exact=False, Server='atlas.gat.com',
-                    write2file = True, gpath = '.'):
+                    write2file=True, gpath='.'):
     import MDSplus
 
     # in case those are passed in as strings
