@@ -262,11 +262,11 @@ class equilParams:
                 R_hold = FluxSurfList[i]['Rs']
                 Z_hold = FluxSurfList[i]['Zs']
 
-                Rs_hold2D[i,:] = R_hold
-                Zs_hold2D[i,:] = Z_hold
-                Btot_hold2D[i,:] = FluxSurfList[i]['Bmod']
-                Bp_hold2D[i,:] = FluxSurfList[i]['Bp']
-                Bt_hold2D[i,:] = FluxSurfList[i]['Bt']
+                Rs_hold2D[i, :] = R_hold
+                Zs_hold2D[i, :] = Z_hold
+                Btot_hold2D[i, :] = FluxSurfList[i]['Bmod']
+                Bp_hold2D[i, :] = FluxSurfList[i]['Bp']
+                Bt_hold2D[i, :] = FluxSurfList[i]['Bt']
                 dpsidR_hold2D[i,:] = dpsidRFunc.ev(R_hold, Z_hold)
                 dpsidZ_hold2D[i,:] = dpsidZFunc.ev(R_hold, Z_hold)
                 d2psidR2_hold2D[i,:] = d2psidR2Func.ev(R_hold, Z_hold)
@@ -400,7 +400,6 @@ class equilParams:
             dV[-1] = (V[-3] - 4*V[-2] + 3*V[-1]) / (psi[-1] - psi[-3])
 
             return {'V':V, 'Vprime':dV}
-
 
         # --------------------------------------------------------------------------------
         # compute and return all of the above

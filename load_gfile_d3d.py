@@ -181,25 +181,25 @@ def read_g_file_mds(shot, time, tree='EFIT01', exact=False, Server='atlas.gat.co
             time = time0
 
     # store data in dictionary
-    g = {'shot':shot, 'time':time}
+    g = {'shot': shot, 'time': time}
 
     # get header line
     header = MDS.get(base + 'ECASE').data()[k]
 
     # get all signals, use same names as in read_g_file
-    translate={'MW':'NR', 'MH':'NZ', 'XDIM':'Xdim', 'ZDIM':'Zdim', 'RZERO':'R0',
-               'RMAXIS':'RmAxis', 'ZMAXIS':'ZmAxis', 'SSIMAG':'psiAxis', 'SSIBRY':'psiSep',
-               'BCENTR':'Bt0', 'CPASMA':'Ip', 'FPOL':'Fpol', 'PRES':'Pres',
-               'FFPRIM':'FFprime', 'PPRIME':'Pprime', 'PSIRZ':'psiRZ', 'QPSI':'qpsi',
-               'NBBBS':'Nlcfs', 'LIMITR':'Nwall'}
+    translate = {'MW': 'NR', 'MH': 'NZ', 'XDIM': 'Xdim', 'ZDIM': 'Zdim', 'RZERO': 'R0',
+                 'RMAXIS': 'RmAxis', 'ZMAXIS': 'ZmAxis', 'SSIMAG': 'psiAxis', 'SSIBRY': 'psiSep',
+                 'BCENTR': 'Bt0', 'CPASMA': 'Ip', 'FPOL': 'Fpol', 'PRES': 'Pres',
+                 'FFPRIM': 'FFprime', 'PPRIME': 'Pprime', 'PSIRZ': 'psiRZ', 'QPSI': 'qpsi',
+                 'NBBBS': 'Nlcfs', 'LIMITR': 'Nwall'}
     for signal in translate:
         g[translate[signal]] = MDS.get(base + signal).data()[k]
 
     g['R1'] = MDS.get(base + 'RGRID').data()[0]
     g['Zmid'] = 0.0
 
-    RLIM = MDS.get(base + 'LIM').data()[:,0]
-    ZLIM = MDS.get(base + 'LIM').data()[:,1]
+    RLIM = MDS.get(base + 'LIM').data()[:, 0]
+    ZLIM = MDS.get(base + 'LIM').data()[:, 1]
     g['wall'] = np.vstack((RLIM, ZLIM)).T
 
     RBBBS = MDS.get(base + 'RBBBS').data()[k][:int(g['Nlcfs'])]
@@ -212,7 +212,8 @@ def read_g_file_mds(shot, time, tree='EFIT01', exact=False, Server='atlas.gat.co
     RHOVN = MDS.get(base + 'RHOVN').data()[k]
 
     # convert floats to integers
-    for item in ['NR', 'NZ', 'Nlcfs', 'Nwall']: g[item] = int(g[item])
+    for item in ['NR', 'NZ', 'Nlcfs', 'Nwall']:
+        g[item] = int(g[item])
 
     # convert single (float32) to double (float64) and round
     for item in ['Xdim', 'Zdim', 'R0', 'R1', 'RmAxis', 'ZmAxis', 'psiAxis', 'psiSep', 'Bt0', 'Ip']:
@@ -322,7 +323,7 @@ def compare_them(g1, g2):
             print 'rel. Error in', item, ':', (g1[item] - g2[item])/g2[item]
 
     # arrays
-    #arrays = [item for item in g2 if ((item not in integers) and (item not in floats))]
+    # arrays = [item for item in g2 if ((item not in integers) and (item not in floats))]
     arrays = ['R', 'Z', 'psiRZ', 'psiRZn', 'Fpol', 'Pres', 'Pprime', 'FFprime', 'qpsi', 'lcfs', 'wall']
     print 'Arrays'
     for item in arrays:

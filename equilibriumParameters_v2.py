@@ -14,7 +14,7 @@ def equilParams(gfileNam, nw=0, nh=0, thetapnts=0, grid2G=False):
     data = gdsk.Geqdsk()
     data.openFile(gfileNam)
 
-    #---- Variables ----
+    # ---- Variables ----
     if(grid2G is True):
         nw = data.get('nw')
         nh = data.get('nh')
@@ -32,7 +32,7 @@ def equilParams(gfileNam, nw=0, nh=0, thetapnts=0, grid2G=False):
     siAxis = data.get('simag')
     siBry = data.get('sibry')
 
-    #---- Profiles ----
+    # ---- Profiles ----
     fpol = data.get('fpol')
     ffunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(fpol)), fpol, s=0)
     fprime = data.get('ffprime')/fpol
