@@ -154,7 +154,7 @@ def read_g_file(shot, time, gpath='.'):
 #   write2file (bool)   ->  True: save g-file (default), False: do not write file
 #   gpath (string)      ->  path where to save g-file, default = current working dir
 
-def read_g_file_mds(shot, time, tree='EFIT01', exact=False, Server='atlas.gat.com',
+def read_g_file_mds(shot, time, tree='EFIT01', exact=False, connection=None,
                     write2file=True, gpath='.'):
     import MDSplus
 
@@ -163,14 +163,15 @@ def read_g_file_mds(shot, time, tree='EFIT01', exact=False, Server='atlas.gat.co
     time = int(time)
 
     # Connect to server, open tree and go to g-file
-    MDS = MDSplus.Connection(Server)
-    MDS.openTree(tree, shot)
+    if connection is None:
+        connection = MDSplus.Connection('atlas.gat.com')
+    connection.openTree(tree, shot)
     base = 'RESULTS:GEQDSK:'
 
     # get time slice
     signal = 'GTIME'
-    k = np.argmin(np.abs(MDS.get(base + signal).data() - time))
-    time0 = int(MDS.get(base + signal).data()[k])
+    k = np.argmin(np.abs(connection.get(base + signal).data() - time))
+    time0 = int(connection.get(base + signal).data()[k])
 
     if (time != time0):
         if exact:
@@ -184,7 +185,7 @@ def read_g_file_mds(shot, time, tree='EFIT01', exact=False, Server='atlas.gat.co
     g = {'shot': shot, 'time': time}
 
     # get header line
-    header = MDS.get(base + 'ECASE').data()[k]
+    header = connection.get(base + 'ECASE').data()[k]
 
     # get all signals, use same names as in read_g_file
     translate = {'MW': 'NR', 'MH': 'NZ', 'XDIM': 'Xdim', 'ZDIM': 'Zdim', 'RZERO': 'R0',
@@ -193,23 +194,23 @@ def read_g_file_mds(shot, time, tree='EFIT01', exact=False, Server='atlas.gat.co
                  'FFPRIM': 'FFprime', 'PPRIME': 'Pprime', 'PSIRZ': 'psiRZ', 'QPSI': 'qpsi',
                  'NBBBS': 'Nlcfs', 'LIMITR': 'Nwall'}
     for signal in translate:
-        g[translate[signal]] = MDS.get(base + signal).data()[k]
+        g[translate[signal]] = connection.get(base + signal).data()[k]
 
-    g['R1'] = MDS.get(base + 'RGRID').data()[0]
+    g['R1'] = connection.get(base + 'RGRID').data()[0]
     g['Zmid'] = 0.0
 
-    RLIM = MDS.get(base + 'LIM').data()[:, 0]
-    ZLIM = MDS.get(base + 'LIM').data()[:, 1]
+    RLIM = connection.get(base + 'LIM').data()[:, 0]
+    ZLIM = connection.get(base + 'LIM').data()[:, 1]
     g['wall'] = np.vstack((RLIM, ZLIM)).T
 
-    RBBBS = MDS.get(base + 'RBBBS').data()[k][:int(g['Nlcfs'])]
-    ZBBBS = MDS.get(base + 'ZBBBS').data()[k][:int(g['Nlcfs'])]
+    RBBBS = connection.get(base + 'RBBBS').data()[k][:int(g['Nlcfs'])]
+    ZBBBS = connection.get(base + 'ZBBBS').data()[k][:int(g['Nlcfs'])]
     g['lcfs'] = np.vstack((RBBBS, ZBBBS)).T
 
     KVTOR = 0
     RVTOR = 1.7
     NMASS = 0
-    RHOVN = MDS.get(base + 'RHOVN').data()[k]
+    RHOVN = connection.get(base + 'RHOVN').data()[k]
 
     # convert floats to integers
     for item in ['NR', 'NZ', 'Nlcfs', 'Nwall']:
@@ -246,7 +247,7 @@ def read_g_file_mds(shot, time, tree='EFIT01', exact=False, Server='atlas.gat.co
             f.write(str(g['Nlcfs']) + ' ' + str(g['Nwall']) + '\n')
             write_array(g['lcfs'].flatten(), f)
             write_array(g['wall'].flatten(), f)
-            f.write(str(KVTOR) + ' ' + format(RVTOR,' .9E') + ' ' + str(NMASS) + '\n')
+            f.write(str(KVTOR) + ' ' + format(RVTOR, ' .9E') + ' ' + str(NMASS) + '\n')
             write_array(RHOVN, f)
 
     # Construct (R,Z) grid for psiRZ
@@ -255,7 +256,7 @@ def read_g_file_mds(shot, time, tree='EFIT01', exact=False, Server='atlas.gat.co
 
     g['dZ'] = g['Zdim']/(g['NZ'] - 1)
     NZ2 = int(np.floor(0.5*g['NZ']))
-    g['Z'] = g['Zmid'] + np.arange(-NZ2,NZ2+1)*g['dZ']
+    g['Z'] = g['Zmid'] + np.arange(-NZ2, NZ2+1)*g['dZ']
 
     # normalize psiRZ
     g['psiRZn'] = (g['psiRZ'] - g['psiAxis']) / (g['psiSep'] - g['psiAxis'])
