@@ -511,11 +511,29 @@ class equilParams:
 
             return {'R':self.RZdict['Rs2D'], 'Z':self.RZdict['Zs2D'], 'j2D':jtot, 'jpar2D':jpar,
                     'jR2D':jR, 'jZ2D':jZ, 'jtor2D':jtor}
-
+                    
+        # --------------------------------------------------------------------------------
+        def plot(self):
+            import matplotlib.pyplot as plt
+            R1d = self.RZdict['Rs1D']
+            Z1d = self.RZdict['Zs1D']
+            Rs, Zs = np.meshgrid(R1d, Z1d)
+            levs = np.append(0.01, np.arange(0.1, 1.1, 0.1))
+            
+            plt.figure(figsize = (6,10))
+            plt.plot(self.rmaxis, self.zmaxis, 'kx', markersize = 5, linewidth = 2)
+            cs1 = plt.contour(Rs, Zs, self.PSIdict['psiN_2D'], levs, colors = 'k')
+            cs1.collections[0].set_label('EFIT')
+            plt.plot(self.g['lcfs'][:,0],self.g['lcfs'][:,1], 'k-', lw = 2, label = 'EFIT Bndy')
+            plt.plot(self.g['wall'][:,0],self.g['wall'][:,1], 'k--')
+            plt.xlim(self.g['wall'][:,0].min()*0.97, self.g['wall'][:,0].max()*1.03)
+            plt.ylim(self.g['wall'][:,1].min()*1.03, self.g['wall'][:,1].max()*1.03)
+            plt.axes().set_aspect('equal')
+            plt.xlabel('R [m]')
+            plt.ylabel('Z [m]')
+            plt.title('Shot: ' + str(self.g['shot']) + '   Time: ' + str(self.g['time']) + ' ms', fontsize = 18)
 
         # --------------------------------------------------------------------------------
-
-
         def length_along_wall(self):
             """
             Compute length along the wall
@@ -553,7 +571,6 @@ class equilParams:
             return Swall, Swall_max
     
         # --------------------------------------------------------------------------------
-    
         def point_along_wall(self, swall, get_index = False):
             """
             Compute matching point R,Z to given swall along wall
@@ -604,10 +621,7 @@ class equilParams:
             if get_index: return p[0], p[1], idx
             else: return p[0], p[1] # R,Z
 
-
         # --------------------------------------------------------------------------------
-
-
         def all_points_along_wall(self, swall, get_index = False):
             """
             Compute matching point R,Z for all given s in array swall along simplified wall
