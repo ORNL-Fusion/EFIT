@@ -11,7 +11,7 @@ try:
     # erf function available from Python 3.2
     from math import erf
 except ImportError:
-    print 'erf import failed, use self-defined method'
+    print('erf import failed, use self-defined method')
     # Try SciPy
     try:
         from scipy.special import erf
@@ -38,7 +38,7 @@ except ImportError:
 try:
     from scipy.interpolate import interp1d
 except:
-    print 'interp1d import failed, use self-defined method'
+    print('interp1d import failed, use self-defined method')
     # Define interpolation functor using NumPy routine
     from numpy import interp
 
@@ -64,7 +64,7 @@ try:
         y = f(x)
         return simps(y, dx=delx)
 except ImportError:
-    print 'integrate import failed, use self-defined method'
+    print('integrate import failed, use self-defined method')
     # Define simple integrate function
 
     def integrate(f, a, b, n=100):
@@ -494,7 +494,7 @@ class Equilibrium:
                 f.species = species.genSpecies(T, d, AA=[None, 2],
                                                dTdpsi=dTdpsi, dndpsi=dndpsi)
             except:
-                print "Warning: No species information"
+                print("Warning: No species information")
             return f
         # No data
         return None
