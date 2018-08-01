@@ -177,8 +177,8 @@ def read_g_file_mds(shot, time, tree='EFIT01', exact=False, connection=None,
         if exact:
             raise RuntimeError(tree + ' does not exactly contain time ' + str(time) + '  ->  Abort')
         else:
-            print 'Warning: ' + tree + ' does not exactly contain time ' + str(time) + ' the closest time is ' + str(time0)
-            print 'Fetching time slice ' + str(time0)
+            print('Warning: ' + tree + ' does not exactly contain time ' + str(time) + ' the closest time is ' + str(time0))
+            print('Fetching time slice ' + str(time0))
             time = time0
 
     # store data in dictionary
@@ -228,7 +228,7 @@ def read_g_file_mds(shot, time, tree='EFIT01', exact=False, connection=None,
     if write2file:
         if not (gpath[-1] == '/'): gpath += '/'
         with open(gpath + 'g' + format(shot,'06d') + '.' + format(time,'05d'), 'w') as f:
-            if ('EFITD' in header[0]) and (len(header) == 6):
+            if (b'EFITD' in header[0]) and (len(header) == 6):
                 for item in header: f.write(item)
             else:
                 f.write('  EFITD    xx/xx/xxxx    #' + str(shot) + '  ' + str(time) + 'ms        ')
@@ -309,26 +309,26 @@ def split_data(line):
 def compare_them(g1, g2):
     # ints
     integers = ['shot', 'time', 'NR', 'NZ', 'Nlcfs', 'Nwall']
-    print 'Integers'
+    print('Integers')
     for item in integers:
-        print 'Error in', item, ':', (g1[item] - g2[item])
+        print('Error in', item, ':', (g1[item] - g2[item]))
 
     # floats
     floats = ['Xdim', 'Zdim', 'R0', 'R1', 'Zmid', 'RmAxis', 'ZmAxis', 'psiAxis', 'psiSep',
               'Bt0', 'Ip', 'dR', 'dZ']
-    print 'Doubles'
+    print('Doubles')
     for item in floats:
         if (g2[item] == 0.0):
-            print 'rel. Error in', item, ':', (g1[item] - g2[item])
+            print('rel. Error in', item, ':', (g1[item] - g2[item]))
         else:
-            print 'rel. Error in', item, ':', (g1[item] - g2[item])/g2[item]
+            print('rel. Error in', item, ':', (g1[item] - g2[item])/g2[item])
 
     # arrays
     # arrays = [item for item in g2 if ((item not in integers) and (item not in floats))]
     arrays = ['R', 'Z', 'psiRZ', 'psiRZn', 'Fpol', 'Pres', 'Pprime', 'FFprime', 'qpsi', 'lcfs', 'wall']
-    print 'Arrays'
+    print('Arrays')
     for item in arrays:
         x = g2[item].copy().flatten()
         x[np.where(x == 0.0)] = 1e-50
         x = x.reshape(g2[item].shape)
-        print 'Max. rel. Error in', item, ':', np.max((g1[item] - g2[item])/x)
+        print('Max. rel. Error in', item, ':', np.max((g1[item] - g2[item])/x))
