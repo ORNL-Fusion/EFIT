@@ -111,6 +111,8 @@ class equilParams:
                       'wall': np.vstack((self.data.get('rlim'), self.data.get('zlim'))).T,
                       'psi': self.PSIdict['psiN1D']
                       }
+                      
+            self.Swall, self.Swall_max = self.length_along_wall()
 
         # --------------------------------------------------------------------------------
         # Interpolation function handles for all 1-D fields in the g-file
@@ -509,6 +511,132 @@ class equilParams:
 
             return {'R':self.RZdict['Rs2D'], 'Z':self.RZdict['Zs2D'], 'j2D':jtot, 'jpar2D':jpar,
                     'jR2D':jR, 'jZ2D':jZ, 'jtor2D':jtor}
+                    
+        # --------------------------------------------------------------------------------
+        def plot(self):
+            import matplotlib.pyplot as plt
+            R1d = self.RZdict['Rs1D']
+            Z1d = self.RZdict['Zs1D']
+            Rs, Zs = np.meshgrid(R1d, Z1d)
+            levs = np.append(0.01, np.arange(0.1, 1.1, 0.1))
+            
+            plt.figure(figsize = (6,10))
+            plt.plot(self.rmaxis, self.zmaxis, 'kx', markersize = 5, linewidth = 2)
+            cs1 = plt.contour(Rs, Zs, self.PSIdict['psiN_2D'], levs, colors = 'k')
+            cs1.collections[0].set_label('EFIT')
+            plt.plot(self.g['lcfs'][:,0],self.g['lcfs'][:,1], 'k-', lw = 2, label = 'EFIT Bndy')
+            plt.plot(self.g['wall'][:,0],self.g['wall'][:,1], 'k--')
+            plt.xlim(self.g['wall'][:,0].min()*0.97, self.g['wall'][:,0].max()*1.03)
+            plt.ylim(self.g['wall'][:,1].min()*1.03, self.g['wall'][:,1].max()*1.03)
+            plt.axes().set_aspect('equal')
+            plt.xlabel('R [m]')
+            plt.ylabel('Z [m]')
+            plt.title('Shot: ' + str(self.g['shot']) + '   Time: ' + str(self.g['time']) + ' ms', fontsize = 18)
+
+        # --------------------------------------------------------------------------------
+        def length_along_wall(self):
+            """
+            Compute length along the wall
+            return Swall, Swall_max
+            """
+            Rwall = self.g['wall'][:,0]
+            Zwall = self.g['wall'][:,1]
+            Nwall = len(Rwall)
+            Swall = np.zeros(Nwall)
+            dir = 1
+        
+            Swall[0] = np.sqrt((Rwall[0] - Rwall[-1])**2 + (Zwall[0] - Zwall[-1])**2)
+            if (Swall[0] > 0):
+                S0 = Zwall[-1]/(Zwall[-1] - Zwall[0])*Swall[0]
+                if (Zwall[0] < Zwall[-1]): dir = 1; # ccw
+                else: dir = -1                                  # cw
+
+            for i in xrange(1,Nwall):
+                Swall[i] = Swall[i-1] + np.sqrt((Rwall[i] - Rwall[i-1])**2 + (Zwall[i] - Zwall[i-1])**2)    #length of curve in m
+                if ((Zwall[i]*Zwall[i-1] <= 0) & (Rwall[i] < self.g['R0'])):
+                    t = Zwall[i-1]/(Zwall[i-1] - Zwall[i])
+                    S0 = Swall[i-1] + t*(Swall[i] - Swall[i-1])
+                    if (Zwall[i] < Zwall[i-1]): dir = 1 # ccw
+                    else: dir = -1                                  # cw
+
+            Swall_max = Swall[-1]
+
+            # set direction and Swall = 0 location
+            for i in xrange(Nwall):
+                Swall[i] = dir*(Swall[i] - S0);
+                if (Swall[i] < 0): Swall[i] += Swall_max
+                if (Swall[i] > Swall_max): Swall[i] -= Swall_max
+                if (abs(Swall[i]) < 1e-12): Swall[i] = 0
+    
+            return Swall, Swall_max
+    
+        # --------------------------------------------------------------------------------
+        def point_along_wall(self, swall, get_index = False):
+            """
+            Compute matching point R,Z to given swall along wall
+            return R,Z
+            """
+            Rwall = self.g['wall'][:,0]
+            Zwall = self.g['wall'][:,1]
+
+            swall = swall%self.Swall_max
+            if(swall < 0): swall += self.Swall_max;
+
+            # locate discontinuity
+            idx_jump = np.where(np.diff(self.Swall) > 0.5*self.Swall_max)[0]
+            if len(idx_jump) == 0: idx_jump = 0
+            else: idx_jump = idx_jump[0] + 1
+
+            # locate intervall that brackets swall
+            if ((swall > self.Swall.max()) | (swall < self.Swall.min())):
+                idx = idx_jump;
+                if (np.abs(swall - self.Swall[idx]) > 0.5*self.Swall_max):
+                    if (swall < self.Swall[idx]): swall += self.Swall_max
+                    else: swall -= self.Swall_max
+            else:
+                idx = 0;
+                s0 = self.Swall[-1]
+                for i in xrange(len(self.Swall)):
+                    s1 = self.Swall[i]
+
+                    if (abs(s1 - s0) > 0.5*self.Swall_max): #skip the jump around Swall = 0 point
+                        s0 = s1
+                        continue
+
+                    if((s1 - swall) * (s0 - swall) <= 0):
+                        idx = i
+                        break
+
+                    s0 = s1
+
+            # set bracket points
+            p1 = np.array([Rwall[idx], Zwall[idx]])
+            if (idx == 0): p2 = np.array([Rwall[-1], Zwall[-1]])
+            else: p2 = np.array([Rwall[idx-1], Zwall[idx-1]])
+
+            # linear interplation between bracket points
+            d = p2 - p1
+            x = np.abs(swall - self.Swall[idx])/np.sqrt(d[0]**2 + d[1]**2); # x is dimensionless in [0,1]
+            p = p1 + x*d
+            if get_index: return p[0], p[1], idx
+            else: return p[0], p[1] # R,Z
+
+        # --------------------------------------------------------------------------------
+        def all_points_along_wall(self, swall, get_index = False):
+            """
+            Compute matching point R,Z for all given s in array swall along simplified wall
+            return R,Z arrays
+            """
+            R,Z,idx = np.zeros(swall.shape),np.zeros(swall.shape),np.zeros(swall.shape)
+            if get_index:
+                for i,s in enumerate(swall):        
+                    R[i],Z[i],idx[i] = self.point_along_wall(s,get_index)
+                return R,Z,idx
+            else:
+                for i,s in enumerate(swall):        
+                    R[i], Z[i] = self.point_along_wall(s)
+                return R,Z
+
 
         # --------------------------------------------------------------------------------
         # --------------------------------------------------------------------------------
