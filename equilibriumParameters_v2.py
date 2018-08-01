@@ -3,7 +3,6 @@ import scipy.interpolate as interp
 import EFIT.geqdsk as gdsk
 import EFIT.equilibrium as eq
 import time
-reload(eq)
 
 
 def equilParams(gfileNam, nw=0, nh=0, thetapnts=0, grid2G=False):
@@ -139,30 +138,30 @@ def equilParams(gfileNam, nw=0, nh=0, thetapnts=0, grid2G=False):
         coeft2 = ((dBpdR_hold-dBpdZ_hold)*(Bp_R_hold**2-Bp_Z_hold**2)+(4*Bp_R_hold*dpsidRdZ_hold*Bp_Z_hold))
         sht2 = fpol_psiN*Bp_R_hold/(fluxSur._R**3*fluxSur._B**2)
         sht3 = fprint_psiN*fluxSur._Bp**2/(fluxSur._B**2)
-        shear_fl[i[0],:] = coeft1*coeft2+sht2-sht3
+        shear_fl[i[0], :] = coeft1*coeft2+sht2-sht3
 
-    print Rs_hold2D[0,0], Zs_hold2D[0,0]
+    print(Rs_hold2D[0, 0], Zs_hold2D[0, 0])
     # parallel current calc
     # jpar = J (dot) B = fprime*B^2/mu0 + pprime*fpol
-    jpar1D = (fpfunc(psiN1D)*Bsqrd/mu0 +ppfunc(psiN1D)*ffunc(psiN1D))/bcentr/1.e6
+    jpar1D = (fpfunc(psiN1D)*Bsqrd/mu0 + ppfunc(psiN1D)*ffunc(psiN1D))/bcentr/1.e6
 
-    #jtor [A/m**2] = R*pprime +ffprime/R/mu0
-    jtor1D = np.abs(Rsminor*ppfunc(psiN1D) +(ffpfunc(psiN1D)/Rsminor/mu0))/1.e6
+    # jtor [A/m**2] = R*pprime +ffprime/R/mu0
+    jtor1D = np.abs(Rsminor*ppfunc(psiN1D) + (ffpfunc(psiN1D)/Rsminor/mu0))/1.e6
 
-    #q profile
+    # q profile
     qprof1D = qfunc(psiN1D)
 
-    #pressure profile
+    # pressure profile
     press1D = pfunc(psiN1D)
 
-    #toroidal field profile
+    # toroidal field profile
     btor1D = ffunc(psiN1D)/Rsminor
 
-    #psitor from Canik's g3d.pro
+    # psitor from Canik's g3d.pro
     pn = np.arange(nw)/float((nw-1))
     dpsi = (pn[1]-pn[0])*(siBry - siAxis)
     hold = np.cumsum(0.5*(qprof1D[0:nw-1]+qprof1D[1:nw])*dpsi)
-    psitor = np.concatenate((np.array([0.]),hold))
+    psitor = np.concatenate((np.array([0.]), hold))
     psitorN1D = (psitor - psitor[0])/(psitor[nw-1]-psitor[0])
 
     paramDICT={}
@@ -188,7 +187,7 @@ def equilParams(gfileNam, nw=0, nh=0, thetapnts=0, grid2G=False):
     paramDICT['S_l_2D']=shear_fl
 
     t1 = time.time()
-    print 'Time:', t1-t0
+    print('Time:', t1-t0)
     return paramDICT
 
 #figure();plot(psiN1D,jpar);axis([0.0,1,0,2]);
@@ -230,6 +229,6 @@ def comp_bisec(psiNVal,theta,rmaxis,zmaxis,Zlowest,psiFunc):
         elif(comp > 1e-4):
             litr +=0.001
         else:
-            print "bunk!"
+            print("bunk!")
             break
     return Rneu,Zneu
