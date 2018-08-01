@@ -693,7 +693,7 @@ class equilParams:
                 elif(comp > 1e-4):
                     litr +=0.001
                 else:
-                    print "bunk!"
+                    print("bunk!")
                     break
             return Rneu,Zneu
 
@@ -785,8 +785,8 @@ class equilParams:
                 N += 1
                 if(N > max_it):
                     if not quiet:
-                        print 'Warning, iterate_RZ: bad convergence, check if error is acceptable'
-                        print 'Iteration: ', N, ', Error: ', ratio
+                        print('Warning, iterate_RZ: bad convergence, check if error is acceptable')
+                        print('Iteration: ', N, ', Error: ', ratio)
                     break
 
             return R, Z
@@ -869,7 +869,7 @@ class equilParams:
         def _read_mds(self, shot, time, tree='EFIT01', exact=False, Server='atlas.gat.com',
                       gpath='.'):
             import MDSplus
-            print 'Reading shot =', shot, 'and time =', time, 'from MDS+ tree:', tree
+            print('Reading shot =', shot, 'and time =', time, 'from MDS+ tree:', tree)
 
             # in case those are passed in as strings
             shot = int(shot)
@@ -889,8 +889,8 @@ class equilParams:
                 if exact:
                     raise RuntimeError(tree + ' does not exactly contain time ' + str(time) + '  ->  Abort')
                 else:
-                    print 'Warning: ' + tree + ' does not exactly contain time ' + str(time) + ' the closest time is ' + str(time0)
-                    print 'Fetching time slice ' + str(time0)
+                    print('Warning: ' + tree + ' does not exactly contain time ' + str(time) + ' the closest time is ' + str(time0))
+                    print('Fetching time slice ' + str(time0))
                     time = time0
 
             # store data in dictionary
