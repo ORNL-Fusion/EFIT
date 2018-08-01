@@ -176,12 +176,12 @@ def main(quiet=True):
     if options.inquire:
         pass
         if not quiet:
-            print geq.getAllVars()
+            print(geq.getAllVars())
 
     if options.all:
         pass
         if not quiet:
-            print geq.getAll()
+            print(geq.getAll())
 
     vs = geq.getAllVars()
     if options.vars != '*':
@@ -190,7 +190,7 @@ def main(quiet=True):
     for v in vs:
         pass
         if not quiet:
-            print '%s: %s' % (v, str(geq.get(v)))
+            print('%s: %s' % (v, str(geq.get(v))))
 
     if options.plot:
         from matplotlib import pylab
@@ -198,7 +198,7 @@ def main(quiet=True):
         if options.vars == '*':
             options.vars = geq.getAllVars()
             if not quiet:
-                print options.vars
+                print(options.vars)
         else:
             vs = options.vars.split(',')
             options.vars = vs
