@@ -1,3 +1,12 @@
+"""
+Interface to read EFIT g-file equilibria.
+Author: A. Wingen
+First Implemented: Sep. 10. 2012
+Please report bugs to: wingen@fusion.gat.com
+"""
+_VERSION = 4.2
+_LAST_UPDATE = 'Aug 24. 2018'
+
 import os
 import numpy as np
 import scipy.integrate as integ
@@ -6,10 +15,12 @@ import scipy.interpolate as interp
 import EFIT.geqdsk as gdsk
 import EFIT.equilibrium as eq
 from Misc.deriv import deriv
-# reload(eq)
 
 
 class equilParams:
+        """
+        Open g-file, read it, and provide dictionary self.g as well as 1D and 2D interpolation functions.
+        """
         def __init__(self, gfileNam, nw=0, nh=0, thetapnts=0, grid2G=True, tree=None,
                      server='atlas.gat.com'):
             # ---- get path, shot number and time from file name ----
