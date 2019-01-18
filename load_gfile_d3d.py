@@ -211,6 +211,10 @@ def read_g_file_mds(shot, time, tree='EFIT01', exact=False, connection=None,
     RVTOR = 1.7
     NMASS = 0
     RHOVN = connection.get(base + 'RHOVN').data()[k]
+    g['kVTOR'] = KVTOR
+    g['rVTOR'] = RVTOR
+    g['NMASS'] = NMASS
+    g['rhoVN'] = RHOVN
 
     # convert floats to integers
     for item in ['NR', 'NZ', 'Nlcfs', 'Nwall']:
