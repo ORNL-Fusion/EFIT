@@ -35,8 +35,15 @@ class equilParams:
                 gfile = gfileNam[idx::]
             idx = gfile.find('.')
             fmtstr = '0' + str(idx-1) + 'd'
-            shot, time = int(gfile[1:idx]), int(gfile[idx+1::])
-
+            shot, time = int(gfile[1:idx]), gfile[idx+1::]
+            if '.' in time:
+                idx = time.find('.')
+                time = time[0:idx]
+            if '_' in time:
+                idx = time.find('_')
+                time = time[0:idx]
+            time = int(time)
+                
             if (not os.path.isfile(gfileNam)) and (tree is None):
                 raise NameError('g-file not found -> Abort!')
 
@@ -647,6 +654,49 @@ class equilParams:
                 for i,s in enumerate(swall):        
                     R[i], Z[i] = self.point_along_wall(s)
                 return R,Z
+
+        # --------------------------------------------------------------------------------
+        def strikeLines(self, quiet = True):
+            """
+            Compute R,Z and swall for both strike points along the wall
+            """
+            from scipy.optimize import bisect
+            
+            swall = np.linspace(0,self.Swall_max,300)
+            R,Z = self.all_points_along_wall(swall)
+            psi = self.psiFunc.ev(R,Z) - 1
+            x = psi[1::] * psi[0:-1] # x < 0 only where psi changes sign
+            idx = np.where(x < 0)[0]
+            if not quiet: print idx
+            if len(idx) < 2: return None	# no strike points. Probably limited discharge
+            
+            idxin = idx[0]
+            idxout = idx[1]
+            
+            f = lambda s: np.float64(self.psiFunc.ev(*self.point_along_wall(s))) - 1
+            swallin = bisect(f,swall[idxin],swall[idxin+1])
+            swallout = bisect(f,swall[idxout],swall[idxout+1])
+            
+            # swap for upper single null
+            if swallin > 0.5*self.Swall_max: swallin,swallout = swallout,swallin
+            
+            Rin,Zin = self.point_along_wall(swallin)
+            Rout,Zout = self.point_along_wall(swallout)
+            
+            d = {'Rin':Rin,'Zin':Zin,'swallin':swallin,'Rout':Rout,'Zout':Zout,'swallout':swallout,'N':len(idx)}
+            
+            # possible double null
+            if len(idx) > 3:
+                idxin2 = idx[3]
+                idxout2 = idx[2]
+                swallin2 = bisect(f,swall[idxin2],swall[idxin2+1])
+                swallout2 = bisect(f,swall[idxout2],swall[idxout2+1])
+                Rin2,Zin2 = self.point_along_wall(swallin2)
+                Rout2,Zout2 = self.point_along_wall(swallout2)
+                d2 = {'Rin2':Rin2,'Zin2':Zin2,'swallin2':swallin2,'Rout2':Rout2,'Zout2':Zout2,'swallout2':swallout2}
+                for key in d2.keys(): d[key] = d2[key]
+            
+            return d
 
 
         # --------------------------------------------------------------------------------
