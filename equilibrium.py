@@ -5,7 +5,7 @@ import math
 import numpy as np
 import copy as cp
 
-import EFIT.species as species
+from . import species as species
 
 try:
     # erf function available from Python 3.2

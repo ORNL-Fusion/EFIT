@@ -12,10 +12,10 @@ import numpy as np
 import scipy.integrate as integ
 import scipy.interpolate as interp
 
-import EFIT.geqdsk as gdsk
-import EFIT.equilibrium as eq
-from Misc.deriv import deriv
-
+from . import geqdsk as gdsk	# this is a relative import
+from . import equilibrium as eq
+try: from Misc.deriv import deriv		# this is an absolute import. Relative imports cannot go beyond toplevel package
+except: from ..Misc.deriv import deriv  # except this class gets imported already from a toplevel package
 
 class equilParams:
         """
