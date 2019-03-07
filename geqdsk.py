@@ -119,6 +119,7 @@ class Geqdsk:
 
         data = []
         while 1:
+            if counter >= len(lines): break    # end of file reached
             line = lines[counter]
             m = re.search(fltsPat, line)
             counter += 1

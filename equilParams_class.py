@@ -95,7 +95,7 @@ class equilParams:
 
             psiN2D = self.PSIdict['psiN_2D'].flatten()
             idx = np.where(psiN2D <= 1)[0]
-            Fpol2D = np.ones(psiN2D.shape) * self.data.get('bcentr') * self.data.get('rcentr')
+            Fpol2D = np.ones(psiN2D.shape) * self.data.get('bcentr') * abs(self.data.get('rcentr'))
             Fpol2D[idx] = self.PROFdict['ffunc'](psiN2D[idx])
             Fpol2D = Fpol2D.reshape(self.PSIdict['psiN_2D'].shape)
             self.Bt_2D = Fpol2D / self.RZdict['Rs2D']
@@ -115,7 +115,7 @@ class equilParams:
             # ---- g dict ----
             self.g = {'shot': shot, 'time': time, 'NR': self.nw, 'NZ': self.nh,
                       'Xdim': self.data.get('rdim'), 'Zdim': self.data.get('zdim'),
-                      'R0': self.data.get('rcentr'), 'R1': self.data.get('rleft'),
+                      'R0': abs(self.data.get('rcentr')), 'R1': self.data.get('rleft'),
                       'Zmid': self.data.get('zmid'), 'RmAxis': self.rmaxis, 'ZmAxis': self.zmaxis,
                       'psiAxis': self.siAxis, 'psiSep': self.siBry, 'Bt0': self.bcentr,
                       'Ip': self.data.get('current'), 'Fpol': self.PROFdict['fpol'],
@@ -562,12 +562,13 @@ class equilParams:
             Nwall = len(Rwall)
             Swall = np.zeros(Nwall)
             dir = 1
+            S0 = 0
         
             Swall[0] = np.sqrt((Rwall[0] - Rwall[-1])**2 + (Zwall[0] - Zwall[-1])**2)
             if (Swall[0] > 0):
                 S0 = Zwall[-1]/(Zwall[-1] - Zwall[0])*Swall[0]
                 if (Zwall[0] < Zwall[-1]): dir = 1; # ccw
-                else: dir = -1                                  # cw
+                else: dir = -1                      # cw
 
             for i in xrange(1,Nwall):
                 Swall[i] = Swall[i-1] + np.sqrt((Rwall[i] - Rwall[i-1])**2 + (Zwall[i] - Zwall[i-1])**2)    #length of curve in m
@@ -575,7 +576,7 @@ class equilParams:
                     t = Zwall[i-1]/(Zwall[i-1] - Zwall[i])
                     S0 = Swall[i-1] + t*(Swall[i] - Swall[i-1])
                     if (Zwall[i] < Zwall[i-1]): dir = 1 # ccw
-                    else: dir = -1                                  # cw
+                    else: dir = -1                      # cw
 
             Swall_max = Swall[-1]
 
@@ -601,7 +602,7 @@ class equilParams:
             if(swall < 0): swall += self.Swall_max;
 
             # locate discontinuity
-            idx_jump = np.where(np.diff(self.Swall) > 0.5*self.Swall_max)[0]
+            idx_jump = np.where(np.abs(np.diff(self.Swall)) > 0.5*self.Swall_max)[0]
             if len(idx_jump) == 0: idx_jump = 0
             else: idx_jump = idx_jump[0] + 1
 
@@ -629,8 +630,10 @@ class equilParams:
 
             # set bracket points
             p1 = np.array([Rwall[idx], Zwall[idx]])
-            if (idx == 0): p2 = np.array([Rwall[-1], Zwall[-1]])
-            else: p2 = np.array([Rwall[idx-1], Zwall[idx-1]])
+            p2, i = p1, 1
+            while np.all(p2 == p1):		# if points are identical
+            	p2 = np.array([Rwall[idx-i], Zwall[idx-i]]) # works for idx == 0 as well
+            	i += 1
 
             # linear interplation between bracket points
             d = p2 - p1
