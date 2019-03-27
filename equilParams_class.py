@@ -702,6 +702,35 @@ class equilParams:
             return d
 
 
+
+        # --------------------------------------------------------------------------------
+        def fluxExpansion(self, target = 'in'):
+            """
+            Calculate flux expansion fx between outer midplane and wall
+            target gives the strike line for which to get fx
+              lower targets: 'in', 'out'
+              upper targets: 'in2', 'out2'
+            returns flux expansion fx
+            Based on: A. Loarte et al., Journal of Nuclear Materials 266-269 (1999) 587-592
+            """            
+            Rmin,Rmax = self.rmaxis,self.g['wall'][:,0].max()
+            R = np.linspace(Rmin,Rmax,200)
+            Z = self.zmaxis * np.ones(200)
+            psi = self.psiFunc.ev(R,Z)
+            f = interp.UnivariateSpline(psi,R,s=0)          
+            Rmid = f(1.0)
+            Bp_mid = self.BpFunc.ev(Rmid,self.zmaxis)
+            
+            d = self.strikeLines()
+            if not d.has_key('R' + target): 
+                print 'Unkown target in fluxExpansion'
+                target = 'in'
+            Rdiv = d['R' + target]
+            Zdiv = d['Z' + target]
+            Bp_div = self.BpFunc.ev(Rdiv,Zdiv)
+            
+            return (Rmid*Bp_mid) / (Rdiv*Bp_div)
+
         # --------------------------------------------------------------------------------
         # --------------------------------------------------------------------------------
         def _s2psi(self, s, fluxLimit):
