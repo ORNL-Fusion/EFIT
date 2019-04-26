@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.interpolate as scinter
 
 
 def pfile(file):
@@ -39,7 +40,7 @@ def pfile(file):
 	return dic
 
 
-def getProfile(file, key, save = False, show = True, N = 301, type = 'tanh0'):
+def getProfile(file, key, save = False, show = True, N = 301, type = 'tanh0', xmin = 0):
 	"""
 	Read a profile from p-file, extend it to psi = 1.2, save and plot 
 	Input:
@@ -49,6 +50,7 @@ def getProfile(file, key, save = False, show = True, N = 301, type = 'tanh0'):
 	  show = bool, make figures, default is True, save figures as eps for save = True as well
 	  N = points in profile
 	  type = options for profile fitting of raw data: 'tanh','tanh0','tanhflat'
+	  xmin = use type fit for x > xmin. For x < xmin, splines are used. The full profile is then combined
 	Return:
 	  psi, pro
 	"""
@@ -63,7 +65,19 @@ def getProfile(file, key, save = False, show = True, N = 301, type = 'tanh0'):
 		x,y,units = p[key]['psi'],p[key]['y'],p[key]['units']
 		rawdata = {'px':x, 'py':y}
 	rawdata['key'],rawdata['units'] = key,units
-	if type in ['tanh', 'tanh0', 'tanhflat']: psi,pro,_ = fit_profile(x,y,type = type,xlim = [0,1.2])
+	if type in ['tanh', 'tanh0', 'tanhflat']:
+		if xmin > 0:
+			idx = x > xmin
+			x0 = x[idx]
+			y0 = y[idx]
+			psi0,pro0,_ = fit_profile(x0,y0,type = type,xlim = [xmin,1.2])
+			x1 = np.append(x[-idx][0:-10],psi0[10::])
+			y1 = np.append(y[-idx][0:-10],pro0[10::])
+			f = scinter.UnivariateSpline(x1, y1, s = 0)
+			psi = np.linspace(0,1.2,N)
+			pro = f(psi)
+		else:
+			psi,pro,_ = fit_profile(x,y,type = type,xlim = [0,1.2],points = N)
 	else: psi,pro = x,y
 	if save:
 		idx = file[::-1].find('/')
@@ -94,10 +108,10 @@ def plotProfile(psi, pro, save  = False, tag = None, rawdata = None):
 		save  = True
 	
 	plt.figure()
+	plt.plot(psi,pro,'k-',lw = 2)
 	if rawdata is not None:
 		if rawdata.has_key('x'): plt.plot(rawdata['x'],rawdata['y'],'ro')
 		if rawdata.has_key('px'): plt.plot(rawdata['px'],rawdata['py'],'r--')
-	plt.plot(psi,pro,'k-',lw = 2)
 	plt.xlabel('$\\psi$')
 	plt.ylabel(rawdata['key'] + ' [' + rawdata['units'] + ']')
 	if save: plt.gcf().savefig(rawdata['key'] + 'Profile' + tag + '.eps', dpi = (300), bbox_inches = 'tight')
