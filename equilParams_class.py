@@ -67,7 +67,7 @@ class equilParams:
                 self.nw = nw
                 self.nh = nh
                 self.thetapnts = thetapnts
-            self.bcentr = np.abs(self.data.get('bcentr'))
+            self.bcentr = self.data.get('bcentr')
             self.rmaxis = self.data.get('rmaxis')
             self.zmaxis = self.data.get('zmaxis')
             self.Rmin = self.data.get('rleft')
