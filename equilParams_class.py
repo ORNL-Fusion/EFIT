@@ -643,20 +643,53 @@ class equilParams:
             else: return p[0], p[1] # R,Z
 
         # --------------------------------------------------------------------------------
-        def all_points_along_wall(self, swall, get_index = False):
+        def all_points_along_wall(self, swall, get_index = False, get_normal = False):
             """
             Compute matching point R,Z for all given s in array swall along simplified wall
             return R,Z arrays
             """
-            R,Z,idx = np.zeros(swall.shape),np.zeros(swall.shape),np.zeros(swall.shape)
-            if get_index:
+            R,Z,idx = np.zeros(swall.shape),np.zeros(swall.shape),np.zeros(swall.shape,dtype = int)
+            if get_normal:
                 for i,s in enumerate(swall):        
-                    R[i],Z[i],idx[i] = self.point_along_wall(s,get_index)
-                return R,Z,idx
+                    R[i],Z[i],idx[i] = self.point_along_wall(s,True)
+                nR,nZ = self.wall_normal(idx)
+                return R,Z,nR,nZ
             else:
-                for i,s in enumerate(swall):        
-                    R[i], Z[i] = self.point_along_wall(s)
-                return R,Z
+                if get_index:
+                    for i,s in enumerate(swall):        
+                        R[i],Z[i],idx[i] = self.point_along_wall(s,get_index)
+                    return R,Z,idx
+                else:
+                    for i,s in enumerate(swall):        
+                        R[i], Z[i] = self.point_along_wall(s)
+                    return R,Z
+
+        # --------------------------------------------------------------------------------
+        def wall_normal(self, idx):
+            """
+            Get normal vector of wall segment idx
+            """
+            Rwall = self.g['wall'][:,0]
+            Zwall = self.g['wall'][:,1]
+
+            if isinstance(idx, int): idx = [idx]
+            nR,nZ = np.zeros(len(idx)),np.zeros(len(idx))
+            
+            for j,k in enumerate(idx):
+                # set bracket points
+                p1 = np.array([Rwall[k], Zwall[k]])
+                p2, i = p1, 1
+                while np.all(p2 == p1):     # if points are identical
+                    p2 = np.array([Rwall[k-i], Zwall[k-i]]) # works for idx == 0 as well
+                    i += 1
+
+                # get normal vector
+                d = p2 - p1
+                n = np.array([-d[1], d[0]])
+                n /= np.sqrt(np.sum(n**2))
+                nR[j],nZ[j] = n[0],n[1]
+                
+            return nR, nZ
 
         # --------------------------------------------------------------------------------
         def strikeLines(self, quiet = True):
