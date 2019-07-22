@@ -14,8 +14,6 @@ import scipy.interpolate as interp
 
 from . import geqdsk as gdsk	# this is a relative import
 from . import equilibrium as eq
-try: from Misc.deriv import deriv		# this is an absolute import. Relative imports cannot go beyond toplevel package
-except: from ..Misc.deriv import deriv  # except this class gets imported already from a toplevel package
 
 class equilParams:
         """
@@ -1108,3 +1106,33 @@ class equilParams:
                 for j in xrange(rest):
                         f.write('% .9E' % (x[rows*5 + j]))
                 f.write('\n')
+
+
+# ----------------------------------------------------------------------------------------
+# ---- End of class ----------------------------------------------------------------------
+
+def deriv(y, x, periodic = False):
+    n = y.size
+    if(n < 3):
+        raise RuntimeError('deriv: arrays must have at least 3 points')
+
+    d = np.zeros(n)
+    for i in range(1, n-1):  # inside the array
+        d[i] = (y[i+1] - y[i-1]) / (x[i+1] - x[i-1])
+
+    if periodic:
+        d[0] = 0.5*(y[1] - y[-1]) / (x[1] - x[0])
+        d[-1] = 0.5*(y[0] - y[-2]) / (x[-1] - x[-2])
+    else:
+        if(abs(x[2] - 2*x[1] + x[0]) < 1e-12):      # equidistant x only
+            d[0] = (-y[2] + 4*y[1] - 3*y[0]) / (x[2] - x[0])
+        else:
+            d[0] = (y[1] - y[0]) / (x[1] - x[0])
+
+        if(abs(x[-1] - 2*x[-2] + x[-3]) < 1e-12):  # equidistant x only
+            d[-1] = (y[-3] - 4*y[-2] + 3*y[-1]) / (x[-1] - x[-3])
+        else:
+            d[-1] = (y[-1] - y[-2]) / (x[-1] - x[-2])
+
+    return d
+

@@ -5,7 +5,6 @@ import math
 import numpy as np
 import copy as cp
 
-from . import species as species
 
 try:
     # erf function available from Python 3.2
@@ -486,6 +485,7 @@ class Equilibrium:
 
             # Create some species
             try:
+                from . import species as species
                 # Try to get profiles
                 d = self.dens(psi)
                 T = self.temp(psi)
@@ -531,6 +531,7 @@ class Equilibrium:
                     Bp = (self.fix['Bp'])[i, :]
                     f = FluxSurface(f, R, Z, Bp)
                     try:
+                        from . import species as species
                         # Try to get profiles
                         psi = (self.fix['psinorm'])[i]
                         d = self.dens(psi)
@@ -541,7 +542,8 @@ class Equilibrium:
                                                        dTdpsi=dTdpsi, dndpsi=dndpsi)
                         f.psinorm = psi
                     except:
-                        raise
+                        print("Warning: No species information")
+                        #raise
                     yield f
 
             return surfgen()
