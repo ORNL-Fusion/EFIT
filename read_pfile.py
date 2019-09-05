@@ -1,3 +1,4 @@
+#!/usr/bin/env python2.7
 import numpy as np
 import scipy.interpolate as scinter
 
@@ -49,12 +50,11 @@ def getProfile(file, key, save = False, show = True, N = 301, type = 'tanh0', xm
 	  save = bool, True: save to file, default is False
 	  show = bool, make figures, default is True, save figures as eps for save = True as well
 	  N = points in profile
-	  type = options for profile fitting of raw data: 'tanh','tanh0','tanhflat'
+	  type = options for profile fitting of raw data: 'tanh','tanh0','tanhflat','spline'
 	  xmin = use type fit for x > xmin. For x < xmin, splines are used. The full profile is then combined
 	Return:
 	  psi, pro
 	"""
-	from Misc.optimize_profiles import fit_profile
 	if '.sav' in file:
 		from scipy.io import readsav
 		rawdata = readsav(file)
@@ -62,10 +62,17 @@ def getProfile(file, key, save = False, show = True, N = 301, type = 'tanh0', xm
 		units = 'a.u.'
 	else:
 		p = pfile(file)
+		if not p.has_key(key):
+			print key, 'not found. Available keys are:'
+			for key in np.sort(p.keys()):
+				print key,
+			print '.'
+			return 0,0
 		x,y,units = p[key]['psi'],p[key]['y'],p[key]['units']
 		rawdata = {'px':x, 'py':y}
 	rawdata['key'],rawdata['units'] = key,units
 	if type in ['tanh', 'tanh0', 'tanhflat']:
+		from Misc.optimize_profiles import fit_profile
 		if xmin > 0:
 			idx = x > xmin
 			x0 = x[idx]
@@ -78,6 +85,10 @@ def getProfile(file, key, save = False, show = True, N = 301, type = 'tanh0', xm
 			pro = f(psi)
 		else:
 			psi,pro,_ = fit_profile(x,y,type = type,xlim = [0,1.2],points = N)
+	elif type in ['spline']:
+		f = scinter.UnivariateSpline(x,y,s = 0)
+		psi = np.linspace(x.min(),x.max(),N)
+		pro = f(psi)
 	else: psi,pro = x,y
 	if save:
 		idx = file[::-1].find('/')
@@ -117,5 +128,30 @@ def plotProfile(psi, pro, save  = False, tag = None, rawdata = None):
 	if save: plt.gcf().savefig(rawdata['key'] + 'Profile' + tag + '.eps', dpi = (300), bbox_inches = 'tight')
 
 
+
+# ----------------------------------------------------------------------------------------
+# --- Launch main() ----------------------------------------------------------------------
+if __name__ == '__main__':
+	import argparse
+	import textwrap
+	import matplotlib.pyplot as plt
+	parser = argparse.ArgumentParser(description = 'Plot the ne,ni,Te,Ti profiles from p-file', 
+				formatter_class = argparse.RawDescriptionHelpFormatter,
+				epilog = textwrap.dedent('''\
+                Examples: read_pfile.py p148712.04101'''))
+
+	parser.add_argument('pfile', help = 'Profile file name or (full or rel.) pathname', type = str)
+	parser.add_argument('-k', '--keys', help = 'List of additional keys to plot, separated by comma, no spaces, e.g. er,nz', type = str, default = None)
+	args = parser.parse_args()
+	
+	keys = ['ne','ni','te','ti']
+	if args.keys is not None:
+		newkeys = args.keys.split(',')
+		for key in newkeys: keys.append(key)
+	
+	for key in keys:
+		_ = getProfile(args.pfile, key, type = 'spline')
+		
+	plt.show()
 
 
