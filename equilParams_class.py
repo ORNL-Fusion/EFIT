@@ -701,7 +701,7 @@ class equilParams:
             psi = self.psiFunc.ev(R,Z) - 1
             x = psi[1::] * psi[0:-1] # x < 0 only where psi changes sign
             idx = np.where(x < 0)[0]
-            if not quiet: print idx
+            if not quiet: print(idx)
             if len(idx) < 2: return None	# no strike points. Probably limited discharge
             
             idxin = idx[0]
@@ -754,7 +754,7 @@ class equilParams:
             
             d = self.strikeLines()
             if not d.has_key('R' + target): 
-                print 'Unkown target in fluxExpansion'
+                print('Unkown target in fluxExpansion')
                 target = 'in'
             Rdiv = d['R' + target]
             Zdiv = d['Z' + target]
