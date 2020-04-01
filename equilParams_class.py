@@ -276,7 +276,7 @@ class equilParams:
             if(FluxSurfList is None):
                 FluxSurfList = self.get_allFluxSur()
 
-            for i in xrange(self.nw):
+            for i in range(self.nw):
                 R_hold = FluxSurfList[i]['Rs']
                 Z_hold = FluxSurfList[i]['Zs']
 
@@ -405,13 +405,13 @@ class equilParams:
             if(FluxSurfList is None):
                 FluxSurfList = self.get_allFluxSur()
 
-            for i in xrange(1, self.nw):
+            for i in range(1, self.nw):
                 rsq = (FluxSurfList[i]['Rs'] - self.rmaxis)**2 + (FluxSurfList[i]['Zs'] - self.zmaxis)**2
                 V[i] = 0.5 * integ.simps(rsq, self.theta)
 
             # dV/dpsi
             dV = np.zeros(self.nw)
-            for i in xrange(1, self.nw - 1):
+            for i in range(1, self.nw - 1):
                 dV[i] = (V[i+1] - V[i-1]) / (psi[i+1] - psi[i-1])
 
             dV[0] = (-V[2] + 4*V[1] - 3*V[0]) / (psi[2] - psi[0])
@@ -486,7 +486,7 @@ class equilParams:
             rmax = max([rup, rdwn])
 
             # iterate
-            for i in xrange(N):
+            for i in range(N):
                 r[i] = self.__bisec__(psi0, theta[i], b=rmax)
 
             R = r*np.cos(theta) + self.rmaxis
@@ -501,11 +501,11 @@ class equilParams:
             jZ = np.zeros(self.RZdict['Rs2D'].shape)
             jtor = np.zeros(self.RZdict['Rs2D'].shape)
 
-            for i in xrange(self.nw):
+            for i in range(self.nw):
                 jR[:, i] = -deriv(self.Bt_2D[:, i], self.RZdict['Zs2D'][:, i])
                 jtor[:, i] = deriv(self.B_R[:, i], self.RZdict['Zs2D'][:, i])
 
-            for i in xrange(self.nh):
+            for i in range(self.nh):
                 jZ[i, :] = deriv(self.Bt_2D[i, :], self.RZdict['Rs2D'][i, :])
                 jtor[i, :] -= deriv(self.B_Z[i, :], self.RZdict['Rs2D'][i, :])
 
@@ -568,7 +568,7 @@ class equilParams:
                 if (Zwall[0] < Zwall[-1]): dir = 1; # ccw
                 else: dir = -1                      # cw
 
-            for i in xrange(1,Nwall):
+            for i in range(1,Nwall):
                 Swall[i] = Swall[i-1] + np.sqrt((Rwall[i] - Rwall[i-1])**2 + (Zwall[i] - Zwall[i-1])**2)    #length of curve in m
                 if ((Zwall[i]*Zwall[i-1] <= 0) & (Rwall[i] < self.g['R0'])):
                     t = Zwall[i-1]/(Zwall[i-1] - Zwall[i])
@@ -579,7 +579,7 @@ class equilParams:
             Swall_max = Swall[-1]
 
             # set direction and Swall = 0 location
-            for i in xrange(Nwall):
+            for i in range(Nwall):
                 Swall[i] = dir*(Swall[i] - S0);
                 if (Swall[i] < 0): Swall[i] += Swall_max
                 if (Swall[i] > Swall_max): Swall[i] -= Swall_max
@@ -613,7 +613,7 @@ class equilParams:
             else:
                 idx = 0;
                 s0 = self.Swall[-1]
-                for i in xrange(len(self.Swall)):
+                for i in range(len(self.Swall)):
                     s1 = self.Swall[i]
 
                     if (abs(s1 - s0) > 0.5*self.Swall_max): #skip the jump around Swall = 0 point
@@ -851,7 +851,7 @@ class equilParams:
             r = get_r_lcfs(theta)
 
             # set initial guess of R & Z
-            for i in xrange(npsi):
+            for i in range(npsi):
                 R[i,:] = rnorm[i]*r*np.cos(theta) + self.rmaxis
                 Z[i,:] = rnorm[i]*r*np.sin(theta) + self.zmaxis
 
@@ -880,7 +880,7 @@ class equilParams:
                 Z -= self.zmaxis
 
                 # find new R, Z by interpolation
-                for j in xrange(nt):
+                for j in range(nt):
                     x = rho_now[1::,j]
                     index = np.argsort(x)
 
@@ -1097,13 +1097,13 @@ class equilParams:
             rows = N/5  # integer division
             rest = N - 5*rows
 
-            for i in xrange(rows):
-                for j in xrange(5):
+            for i in range(rows):
+                for j in range(5):
                         f.write('% .9E' % (x[i*5 + j]))
                 f.write('\n')
 
             if(rest > 0):
-                for j in xrange(rest):
+                for j in range(rest):
                         f.write('% .9E' % (x[rows*5 + j]))
                 f.write('\n')
 
