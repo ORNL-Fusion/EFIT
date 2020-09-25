@@ -58,7 +58,7 @@ def equilParams(gfileNam, nw=0, nh=0, thetapnts=0, grid2G=False):
 
     gRs, gZs = np.meshgrid(np.linspace(Rmin, Rmax, g_psi2D.shape[1]),
                            np.linspace(Zmin, Zmax, g_psi2D.shape[0]))
-    psi2D = interp.griddata((gRs.flatten(0), gZs.flatten(0)), g_psi2D.flatten(0), (Rs1D[:, None],
+    psi2D = interp.griddata((gRs.flatten('C'), gZs.flatten('C')), g_psi2D.flatten('C'), (Rs1D[:, None],
                             Zs1D[None, :]), method='cubic', fill_value=0.0)
     psi2D = psi2D.T
 
