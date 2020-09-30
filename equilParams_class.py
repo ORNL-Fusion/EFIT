@@ -868,7 +868,7 @@ class equilParams:
             while(ratio > eps):
                 # get psi for the current R, Z
                 psi_now = get_psi.ev(R.flatten(), Z.flatten())
-                psi_now[np.abs(psi_now) < 1e-7] = 0     # check for small values (no negatives!)
+                psi_now[psi_now < 1e-7] = 0     # check for small values (no negatives!)
                 psi_now = psi_now.reshape(R.shape)
                 rho_now = np.sqrt(psi_now)
 
