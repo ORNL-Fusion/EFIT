@@ -4,8 +4,8 @@ Author: A. Wingen
 First Implemented: Sep. 10. 2012
 Please report bugs to: wingen@fusion.gat.com
 """
-_VERSION = 4.2
-_LAST_UPDATE = 'Aug 24. 2018'
+_VERSION = 4.3
+_LAST_UPDATE = 'Sep 30. 2020'
 
 import os
 import numpy as np
