@@ -903,7 +903,7 @@ class equilParams:
 
                 # Compute convergence error
                 delta = np.sqrt((R - R_old )**2 + (Z - Z_old)**2)
-                ratio = (delta[-idx]/(r[-idx] + 1e-20)).max()
+                ratio = (delta[-idx]/(r[-idx] + 1.0e-20)).max()
 
                 # no convergence check
                 N += 1

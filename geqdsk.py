@@ -136,7 +136,10 @@ class Geqdsk:
         self.data['zlim'] = numpy.zeros( (limitr,), numpy.float64 ), "Z of surrounding limiter contour in meter"
         for i in range(limitr):
             self.data['rlim'][0][i] = data[2*nbbbs + 2*i]
-            self.data['zlim'][0][i] = data[2*nbbbs + 2*i + 1]
+            try:
+                self.data['zlim'][0][i] = data[2*nbbbs + 2*i + 1]
+            except IndexError:
+                print('Warning: Limiter in geqdsk file was an unexpected size')
 
     def getAll(self):
         return self.data
