@@ -23,7 +23,7 @@ def read_g_file(shot, time, gpath='.'):
             line = f.readline()
             line = split_data(line)  # g-file does not always have blank spaces between data points
             data.append([float(x) for x in line])
-        data = np.array(data).flatten(0)
+        data = np.array(data).flatten('C')
 
         # Distance from inner edge to outer edge covered by EFIT, in [m]
         Xdim = data[0].astype(np.min_scalar_type(data[0]))

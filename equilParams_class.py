@@ -4,8 +4,8 @@ Author: A. Wingen
 First Implemented: Sep. 10. 2012
 Please report bugs to: wingen@fusion.gat.com
 """
-_VERSION = 4.2
-_LAST_UPDATE = 'Aug 24. 2018'
+_VERSION = 4.3
+_LAST_UPDATE = 'Sep 30. 2020'
 
 import os
 import numpy as np
@@ -129,6 +129,7 @@ class equilParams:
                       }
                       
             self.Swall, self.Swall_max = self.length_along_wall()
+            self.FluxSurfList = None
 
         # --------------------------------------------------------------------------------
         # Interpolation function handles for all 1-D fields in the g-file
@@ -224,13 +225,22 @@ class equilParams:
 
         # --------------------------------------------------------------------------------
         # (R,Z) and B-fields for all flux surfaces given by 1-D normalized poloidal flux array psiN1D
-        def get_allFluxSur(self):
+        def get_allFluxSur(self, rerun = False):
+            if not rerun:
+                if self.FluxSurfList is not None: return self.FluxSurfList
+            
             FluxSurList = []
-            R, Z = self.__get_RZ__(self.theta, self.PSIdict['psiN1D'], quiet=True)
+            getRZ_failed = False
+            try: R, Z = self.__get_RZ__(self.theta, self.PSIdict['psiN1D'], quiet=True)
+            except: getRZ_failed = True
+            if getRZ_failed: print('getRZ failed, using backup method')
 
             for i, psiNVal in enumerate(self.PSIdict['psiN1D']):
-                R_hold = R[i, :]
-                Z_hold = Z[i, :]
+                if getRZ_failed:
+                    R_hold,Z_hold = self.flux_surface(psiNVal, 0, theta = self.theta)
+                else:
+                    R_hold = R[i, :]
+                    Z_hold = Z[i, :]
 
                 Bp_hold = self.BpFunc.ev(R_hold, Z_hold)
                 fpol_psiN = self.PROFdict['fpol'][i] * np.ones(self.thetapnts)
@@ -244,7 +254,8 @@ class equilParams:
                            'Bmod':Bmod, 'fpol_psiN':fpol_psiN, 'FS':fluxSur}
 
                 FluxSurList.append(FluxSur)
-
+                
+            self.FluxSurfList = FluxSurList
             return FluxSurList
 
         # --------------------------------------------------------------------------------
@@ -825,7 +836,7 @@ class equilParams:
         # --------------------------------------------------------------------------------
         # returns 2D-arrays R and Z for all (theta, psi) points
         # theta and psi are 1D base arrays of a regular grid.
-        def __get_RZ__(self, theta, psi, quiet = False):
+        def __get_RZ__(self, theta, psi, quiet = False, verify = True):
             npsi = psi.size
             nt = theta.size
             R = np.zeros((npsi, nt))
@@ -868,7 +879,7 @@ class equilParams:
             while(ratio > eps):
                 # get psi for the current R, Z
                 psi_now = get_psi.ev(R.flatten(), Z.flatten())
-                psi_now[np.abs(psi_now) < 1e-7] = 0     # check for small values (no negatives!)
+                psi_now[psi_now < 1e-7] = 0     # check for small values (no negatives!)
                 psi_now = psi_now.reshape(R.shape)
                 rho_now = np.sqrt(psi_now)
 
@@ -913,6 +924,10 @@ class equilParams:
                         print('Iteration: ', N, ', Error: ', ratio)
                     break
 
+            if verify:
+                R_chk,Z_chk = self.flux_surface(psi[2], 0, theta = theta)
+                if np.abs(R[2,:] - R_chk).max() > 1e-5:
+                    raise RuntimeError("getRZ no convergence")
             return R, Z
 
 
