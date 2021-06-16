@@ -3,6 +3,7 @@ Interface to read EFIT g-file equilibria.
 Author: A. Wingen
 First Implemented: Sep. 10. 2012
 Please report bugs to: wingen@fusion.gat.com
+Python 2.7 version, discontinued
 """
 _VERSION = 4.3
 _LAST_UPDATE = 'Sep 30. 2020'
