@@ -1,6 +1,5 @@
 import numpy as np
 import EFIT.equilParams_class as ePc
-reload(ePc)
 
 def equilParams(gfileNam, nw = 0, nh = 0, thetapnts = 0, grid2G = True):
 	# initiate class ans store R, Z and psi

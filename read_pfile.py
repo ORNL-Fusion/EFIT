@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 import numpy as np
 import scipy.interpolate as scinter
 
@@ -62,11 +62,10 @@ def getProfile(file, key, save = False, show = True, N = 301, type = 'tanh0', xm
 		units = 'a.u.'
 	else:
 		p = pfile(file)
-		if not p.has_key(key):
-			print key, 'not found. Available keys are:'
-			for key in np.sort(p.keys()):
-				print key,
-			print '.'
+		if key not in p:
+			print (key, 'not found. Available keys are:')
+			for key in np.sort(list(p.keys())):
+				print (key)
 			return 0,0
 		x,y,units = p[key]['psi'],p[key]['y'],p[key]['units']
 		rawdata = {'px':x, 'py':y}
@@ -101,7 +100,7 @@ def getProfile(file, key, save = False, show = True, N = 301, type = 'tanh0', xm
 		with open(key + '_' + tag + '.dat','w') as f:
 			f.write('# ' + key + ' profile in ' + units + ', based of p-file ' + file + ' \n')
 			f.write('# psi          ' + key + ' [' + units + '] \n')
-			for i in xrange(len(psi)):
+			for i in range(len(psi)):
 				f.write(format(psi[i],' 13.7e') + ' \t' + format(pro[i],' 13.7e') + '\n')
 	return psi, pro
 
@@ -121,8 +120,8 @@ def plotProfile(psi, pro, save  = False, tag = None, rawdata = None):
 	plt.figure()
 	plt.plot(psi,pro,'k-',lw = 2)
 	if rawdata is not None:
-		if rawdata.has_key('x'): plt.plot(rawdata['x'],rawdata['y'],'ro')
-		if rawdata.has_key('px'): plt.plot(rawdata['px'],rawdata['py'],'r--')
+		if 'x' in rawdata: plt.plot(rawdata['x'],rawdata['y'],'ro')
+		if 'px' in rawdata: plt.plot(rawdata['px'],rawdata['py'],'r--')
 	plt.xlabel('$\\psi$')
 	plt.ylabel(rawdata['key'] + ' [' + rawdata['units'] + ']')
 	if save: plt.gcf().savefig(rawdata['key'] + 'Profile' + tag + '.eps', dpi = (300), bbox_inches = 'tight')

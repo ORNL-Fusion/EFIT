@@ -52,10 +52,10 @@ class Bsquare:
 		dpsidR = zeros(psiRZ.shape)
 		dpsidZ = zeros(psiRZ.shape)
 	
-		for i in xrange(1,len(R)-1):
+		for i in range(1,len(R)-1):
 			dpsidR[:,i] = 0.5*(psiRZ[:,i+1] - psiRZ[:,i-1])/dR
 		
-		for i in xrange(1,len(Z)-1):
+		for i in range(1,len(Z)-1):
 			dpsidZ[i,:] = 0.5*(psiRZ[i+1,:] - psiRZ[i-1,:])/dZ
 		
 		return dpsidR, dpsidZ
@@ -86,7 +86,7 @@ class Bsquare:
 			if(psi[-1] == 1.0): psi = psi.copy(); psi[-1] = 0.999798
 			n = len(psi)
 			Bsq = zeros(n)
-			for i in xrange(n):
+			for i in range(n):
 				Bsq[i] = self.B_square(psi[i])
 				#print 'done:', i
 		else:
@@ -106,7 +106,7 @@ class Bsquare:
 	
 		# Integrate along surface
 		B = 0; L = 0;
-		for i in xrange(N-1):
+		for i in range(N-1):
 			dli = sqrt((R[i+1]-R[i])**2 + (Z[i+1]-Z[i])**2)
 			B += sqrt(B_t[i]**2 + B_th[i]**2)*dli
 			L += dli
@@ -145,14 +145,14 @@ class Bsquare:
 		r = zeros(theta.shape)
 	
 		if(method == 'best'):
-			for i in xrange(N): 
+			for i in range(N): 
 				try:
 					r[i] = self.newton(psi0, theta[i], 0.25*sqrt(psi0))
 				except RuntimeError:
 					#print i, 'redo it with bisec'
 					r[i] = self.bisec(psi0, theta[i])
 		else:
-			for i in xrange(N): r[i] = self.bisec(psi0, theta[i])
+			for i in range(N): r[i] = self.bisec(psi0, theta[i])
 	
 		R = r*cos(theta) + self.g['RmAxis']
 		Z = r*sin(theta) + self.g['ZmAxis']

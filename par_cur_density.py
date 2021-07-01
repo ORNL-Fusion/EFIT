@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.interpolate as interp
-import geqdsk as gdsk
-import equilibrium as eq
+from . import geqdsk as gdsk
+from . import equilibrium as eq
 
 g_fnam = 'g148712.04101'
 #g_fnam = 'g149189.02400'
@@ -142,6 +142,6 @@ def comp_bisec(psiNVal,theta,rmaxis,zmaxis,Zlowest,psiFunc):
 		elif(comp > 1e-4):
 			litr +=0.001
 		else:
-			print "bunk!"
+			print ("bunk!")
 			break
 	return Rneu,Zneu

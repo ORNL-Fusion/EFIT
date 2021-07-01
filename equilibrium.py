@@ -75,11 +75,11 @@ except ImportError:
         si = 0.0
         sp = 0.0
 
-        for i in xrange(1, n, 2):
+        for i in range(1, n, 2):
             xk = a + i*h
             si += f(xk)
 
-        for i in xrange(2, n, 2):
+        for i in range(2, n, 2):
             xk = a + i*h
             sp += f(xk)
 
@@ -229,7 +229,7 @@ class FluxSurface:
         which returns the value as a function of poloidal angle
 
         """
-        if not self.__dict__.has_key("_avintbp"):
+        if "_avintbp" not in self.__dict__:
             # Cache this integral as used a lot
             self._avintbp = self.integral(lambda x: 1./self.Bp(x))
 
@@ -246,7 +246,7 @@ class FluxSurface:
         """ Calculate inverse aspect ratio r/R
         """
 
-        if self.__dict__.has_key("_eps"):
+        if "_eps" in self.__dict__:
             return self._eps
 
         Rav = self.average(self.R)
@@ -291,10 +291,10 @@ class Equilibrium:
             required = ['npsi', 'npol', 'psi', 'f(psi)', 'p', 'R', 'Z', 'Bp']
 
             for r in required:
-                if not fix.has_key(r):
+                if r not in fix:
                     raise ValueError("Missing key: " + r)
 
-            if not fix.has_key("psinorm"):
+            if "psinorm" not in fix:
                 # Add normalised psi, assuming core to edge
                 psi = fix['psi']
                 fix['psinorm'] = (psi - psi[0]) / (psi[-1] - psi[0])
@@ -307,7 +307,7 @@ class Equilibrium:
             self.pressure = interp1d(self.fix['psinorm'], self.fix['p'], copy=False)
 
             # See if density, temperature profiles also set
-            if fix.has_key("ne"):
+            if "ne" in fix:
                 self.setDensity(self.fix["ne"])
         else:
             self.fix = None

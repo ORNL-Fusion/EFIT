@@ -63,9 +63,9 @@ def bcuint(y,y1,y2,y12,x1l,x1u,x2l,x2u,x1,x2):
 	ny	= np.size(y[:,0])
 	d1	= np.zeros((ny,4),dtype='float64')
 	d2	= np.zeros((ny,4),dtype='float64')
-	for i in xrange(3):
+	for i in range(3):
 		d1[:,i] = x1u-x1l
-	for i in xrange(3):
+	for i in range(3):
 		d2[:,i] = x2u-x2l
 	c = bcucof(y,y1,y2,y12,d1,d2)
 	t = (x1-x1l) / (x1u-x1l)
@@ -152,7 +152,7 @@ def rho_angle(dx,dy,**kwds):
 	js 	= np.argsort(ang,axis=0)
 	tpi	= np.float64(2.0*np.pi)
 
-	if kwds.has_key('periodic'):
+	if 'periodic' in kwds:
   		Is,ind 	= np.unique(ang,return_index=True)
   		Is = Is[ind]
   		rho	= rho[Is]
@@ -161,7 +161,7 @@ def rho_angle(dx,dy,**kwds):
   		rho	= [rho[nis-1],rho,rho[0]]
   		ang	= [ang[nis-1]-tpi,ang,ang[0]+tpi]
 
-	if kwds.has_key('extend'):
+	if 'extend' in kwds:
 		Is,ind 	= np.unique(ang,return_index=True)
 		Is = Is[ind]
 		rho	= rho[Is]
@@ -206,10 +206,10 @@ def psistruc(s):
 def deriv(y,*x):
 	n = np.size(y)
 	if n < 3:
-		print 'Parameters must have at least 3 points'
+		print ('Parameters must have at least 3 points')
 	if (len(x) > 1):
 		if (n != np.size(x)):
-			print 'Vectors must have same size'
+			print ('Vectors must have same size')
 		d = np.array((np.roll(y,-1) - np.roll(y,1))/(np.roll(x,-1) - np.roll(x,1)),dtype='float64')
 		d[0] = (-3.0*y[0] + 4.0*y[1] - y[2])/(x[2]-x[0])
 		d[n-1] = (3.0*y[n-1] - 4.*y[n-2] + y[n-3])/(x[n-1]-x[n-3])
@@ -231,11 +231,11 @@ def gradpsi(psirz):
 	dpsidr	= np.zeros((nr,nz),dtype='float64')
 	dpsidz	= np.zeros((nr,nz),dtype='float64')
 	d2psidrdz= np.zeros((nr,nz),dtype='float64')
-	for i in xrange(nz-1):
+	for i in range(nz-1):
 		dpsidr[:,i] = deriv(psi[:,i],r[:,i])
-	for j in xrange(nr-1):
+	for j in range(nr-1):
 		dpsidz[j,:] = deriv(psi[j,:],z[j,:])
-	for j in xrange(nr-1):
+	for j in range(nr-1):
 		d2psidrdz[j,:] 	= deriv(dpsidr[j,:],z[j,:])
 	return {'dpsidr':dpsidr,'dpsidz':dpsidz,'d2psidrdz':d2psidrdz}
 
@@ -275,7 +275,7 @@ def fs_average(A, J, theta):
 def fs_average_array(A, J, theta):
 	nr	= np.size(A[0,:])
 	result	= np.zeros(nr,dtype='float64')
-	for k in xrange(nr-1):
+	for k in range(nr-1):
 		result[k] = fs_average(A[:,k],J[:,k],theta)
 	return result.squeeze()
 
@@ -287,7 +287,7 @@ def fs_average_array_efc(A, efc):
 	result	= np.zeros(nr,dtype='float64')
 	J	= efc['Jacobian']
 	theta	= efc['theta']
-	for k in xrange(nr-1):
+	for k in range(nr-1):
 		result[k] = fs_average(A[:,k],J[:,k],theta)
 	return result.squeeze()
 
@@ -303,7 +303,7 @@ def volume_integrate(A,efc):
 	theta	= efc['theta']
 	psiv	= efc['psivec']
 	tmp	= np.zeros(nr,dtype='float64')
-	for i in xrange(nr-1):
+	for i in range(nr-1):
 		tmp[i] = definteg1(theta,A[:,i]*Jac[:,i])
 	IntdV	= np.float64(2.0*np.pi)*antideriv1(psiv,tmp)
 	return IntdV
@@ -325,7 +325,7 @@ def volume_integral_profile(f,efc,*average):
 	nt	= efc['nt']
 	nr	= efc['nr']
 	A = np.zeros((nt,nr),dtype='float64')
-	for i in xrange(nt-1):
+	for i in range(nt-1):
 		A[i,:] = f
 	tmp	= volume_integrate(A,efc)
 	val	= tmp[np.size(tmp)-1]
@@ -344,7 +344,7 @@ def area_integrate(A,efc):
 	psiv	= efc['psivec']
 	R	= efc['x']
 	tmp	= np.zeros(nr,dtype='float64')
-	for i in xrange(nr-1):
+	for i in range(nr-1):
 		tmp[i] = definteg1(theta,A[:,i]*Jac[:,i]/R[:,i])
 	IntdA	= antideriv1(psiv,tmp)
 	return IntdA
@@ -430,9 +430,9 @@ def fit_boundary(xb,zb,nthe,*udsym,**uniform):
 	if(isymd == 1):
 		zfit = zsym
 	if(isymd == 1):
-		print '		'
-		print 'Boundary fit forced to be up/down symmetric.'
-		print '		'
+		print ('		')
+		print ('Boundary fit forced to be up/down symmetric.')
+		print ('		')
 
 	return {'xfit':xfit,'zfit':zfit,'nthe':nthe,'angle':angle,'theta':theta}
 
@@ -528,13 +528,13 @@ def refine_null_position(rin,zin,psidata,*quiet,**kwds):
 			dlnew1	= np.sqrt(dr1**2 + dz1**2)
 
 			if(rnew1 > p['rv'].max()):
-				itry1 = 0L
+				itry1 = 0
 			if(znew1 > p['zv'].max()):
-				itry1 = 0L
+				itry1 = 0
 			if(rnew1 < p['rv'].min()):
-				itry1 = 0L
+				itry1 = 0
 			if(znew1 < p['zv'].min()):
-				itry1 = 0L
+				itry1 = 0
 
 			if(dlnew1 < lconv):
 				rin = rnew1
@@ -546,16 +546,16 @@ def refine_null_position(rin,zin,psidata,*quiet,**kwds):
 				chkvar	= costhe*ipfin2['dpsidr']+sinthe*ipfin2['dpsidz']
 				chkvars	= np.sign(chkvar/np.mean(np.abs(chkvar)))
 				ichange	= np.where(chkvars != chkvars[0])
-				ixpoint	= 0L
+				ixpoint	= 0
 				if(ichange[0] != -1):
-					ixpoint = 1L
-				iopoint	= 1L-ixpoint
+					ixpoint = 1
+				iopoint	= 1-ixpoint
 
 				fmtnll1= "Found possible poloidal field {}-point at (R,Z) [m]: ({:9.5f},{:9.5f})"
-				if(kwds.has_key('ixpoint') and verbose):
-					print fmtnll1.format('X',rin,zin)
-				if(kwds.has_key('iopoint') and verbose):
-					print fmtnll1.format('O',rin,zin)
+				if ('ixpoint' in kwds) and verbose:
+					print (fmtnll1.format('X',rin,zin))
+				if ('iopoint' in kwds) and verbose:
+					print (fmtnll1.format('O',rin,zin))
 				return rin,zin
 
 		# METHOD 2 FOR FINDING NULL
@@ -592,13 +592,13 @@ def refine_null_position(rin,zin,psidata,*quiet,**kwds):
 			dlnew2 = np.sqrt(dr2**2 + dz2**2)
 
 			if(rnew2 > p['rv'].max()):
-				itry2 = 0L
+				itry2 = 0
 			if(znew2 > p['zv'].max()):
-				itry2 = 0L
+				itry2 = 0
 			if(rnew2 < p['rv'].min()):
-				itry2 = 0L
+				itry2 = 0
 			if(znew2 < p['zv'].min()):
-				itry2 = 0L
+				itry2 = 0
 			if(dlnew2 < lconv):
 				rin 	= rnew2
 				zin 	= znew2
@@ -609,15 +609,15 @@ def refine_null_position(rin,zin,psidata,*quiet,**kwds):
 				chkvar	= costhe*ipfin2['dpsidr']+sinthe*ipfin2['dpsidz']
 				chkvars	= np.sign(chkvar/np.mean(np.abs(chkvar)))
 				ichange	= np.where(chkvars != chkvars[0])
-				ixpoint	= 0L
+				ixpoint	= 0
 				if(ichange[0] != -1):
-					ixpoint = 1L
-				iopoint	= 1L-ixpoint
+					ixpoint = 1
+				iopoint	= 1-ixpoint
 				fmtnll2= "Found possible poloidal field {}-point at (R,Z) [m]: ({:9.5f},{:9.5f})"
-				if(kwds.has_key('ixpoint') and verbose):
-					print fmtnll2.format('X',rin,zin)
-				if(kwds.has_key('iopoint') and verbose):
-					print fmtnll2.format('O',rin,zin)
+				if ('ixpoint' in kwds) and verbose:
+					print (fmtnll2.format('X',rin,zin))
+				if ('iopoint' in kwds) and verbose:
+					print (fmtnll2.format('O',rin,zin))
 				#xyz = ''
 				#read,'Enter <s> to stop: ',xyz
 				#if(xyz == 's'):
@@ -627,7 +627,7 @@ def refine_null_position(rin,zin,psidata,*quiet,**kwds):
 			return rin,zin
 		if(icount > maxiters):
 			if verbose:
-				print 'Maximum number of iterations exceeded.'
+				print ('Maximum number of iterations exceeded.')
 			break
 	return
 
@@ -699,22 +699,22 @@ def flux_coordinate_jacobian(x,z,thev,psiv,*delstar_psi):
 		rho[0] = small
 
 	#--- rhoarr = 2D rho array
-	for i in xrange(nthe-1):
+	for i in range(nthe-1):
 		rhoarr[i,:] = rho
 
 	#--- Compute theta derivatives of X and Z
-	for j in xrange(npsi-1):
+	for j in range(npsi-1):
 		xthe[:,j] = deriv(the,dx[:,j])
-	for j in xrange(npsi-1):
+	for j in range(npsi-1):
 		zthe[:,j] = deriv(the,dz[:,j])
 
 	#--- Correct theta derivative at end-points
 	thep	= [the[0]-(the[nthe-1]-the[nthe-2]),the[0],the[1]]
 	dxthe	= np.ones((3,npsi),dtype='float64')
 	dzthe	= np.ones((3,npsi),dtype='float64')
-	for j in xrange(npsi-1):
+	for j in range(npsi-1):
 		dxthe[:,j] = deriv(thep,dx[[nthe-2,0,1],j])
-	for j in xrange(npsi-1):
+	for j in range(npsi-1):
 		dzthe[:,j] = deriv(thep,dz[[nthe-2,0,1],j])
 	xthe[0,:]	= dxthe[1,:]
 	zthe[0,:]	= dzthe[1,:]
@@ -728,9 +728,9 @@ def flux_coordinate_jacobian(x,z,thev,psiv,*delstar_psi):
 	xtheh[:,0] = 2.0*xtheh[:,1]-xtheh[:,2]
 	ztheh[:,0] = 2.0*ztheh[:,1]-ztheh[:,2]
 	#--- Compute rho derivatives
-	for i in xrange(nthe-1):
+	for i in range(nthe-1):
 		xrho[i,:] = deriv(rho,dx[i,:])
-	for i in xrange(nthe-1):
+	for i in range(nthe-1):
 		zrho[i,:] = deriv(rho,dz[i,:])
 
 	#--- Compute psi derivatives
@@ -745,11 +745,11 @@ def flux_coordinate_jacobian(x,z,thev,psiv,*delstar_psi):
 	iJdt	= np.ones(npsi,dtype='float64')
 	iJBp2dt	= np.ones(npsi,dtype='float64')
 	iJRm2dt	= np.ones(npsi,dtype='float64')
-	for j in xrange(npsi-1):
+	for j in range(npsi-1):
 		iJdt[j] = definteg1(the,jac[:,j])
-	for j in xrange(npsi-1):
+	for j in range(npsi-1):
 		iJBp2dt[j] = definteg1(the,jac[:,j]*Bp2[:,j])
-	for j in xrange(npsi-1):
+	for j in range(npsi-1):
 		iJRm2dt[j] = definteg1(the,jac[:,j]/x[:,j]**2)
 	mom	= {'iJdt':iJdt,'iJBp2dt':iJBp2dt,'iJRm2dt':iJRm2dt}
 
@@ -759,9 +759,9 @@ def flux_coordinate_jacobian(x,z,thev,psiv,*delstar_psi):
 		zdr	= np.ones((nthe,npsi),dtype='float64')
 		rdrarg	= zthe/jac
 		zdrarg	= xthe/det
-		for i in xrange(nthe-1):
+		for i in range(nthe-1):
 			rdr[i,:] = deriv(rho,rdrarg[i,:])
-		for i in xrange(nthe-1):
+		for i in range(nthe-1):
 			zdr[i,:] = deriv(rho,zdrarg[i,:])
 
 		#--- Compute theta derivatives for delstar-psi
@@ -769,18 +769,18 @@ def flux_coordinate_jacobian(x,z,thev,psiv,*delstar_psi):
 		zdt	= np.ones((nthe,npsi),dtype='float64')
 		rdtarg	= ztheh/jac
 		zdtarg	= xtheh/det
-		for j in xrange(npsi-1):
+		for j in range(npsi-1):
 			rdt[:,j] = deriv(the,rdtarg[:,j])
-		for j in xrange(npsi-1):
+		for j in range(npsi-1):
 			zdt[:,j] = deriv(the,zdtarg[:,j])
 
 		#--- Correct theta derivative at end-points
 		thep	= [the[0]-(the[nthe-1]-the[nthe-2]),the[0],the[1]]
 		dxt	= np.ones((3,npsi),dtype='float64')
 		dzt	= np.ones((3,npsi),dtype='float64')
-		for j in xrange(npsi-1):
+		for j in range(npsi-1):
 			dxt[:,j] = deriv(thep,rdtarg[[nthe-2,0,1],j])
-		for j in xrange(npsi-1):
+		for j in range(npsi-1):
 			dzt[:,j] = deriv(thep,zdtarg[[nthe-2,0,1],j])
 		rdt[0,:]	= dxt[1,:]
 		zdt[0,:]	= dzt[1,:]
@@ -814,7 +814,7 @@ def change_theta_coordinate(x,z,thev,psiv,**kwds):
 	nt	= np.size(x[:,0])
 	nr	= np.size(x[0,:])
 	ntnew	= nt
-	if kwds.has_key('ntheta'):
+	if 'ntheta' in kwds:
 		ntnew = ntheta
 
 	arg	= np.ones((nt,nr),dtype='float64')
@@ -829,15 +829,15 @@ def change_theta_coordinate(x,z,thev,psiv,**kwds):
 	txtha	= txt0+'HAMADA...'
 	txtlr	= txt0+'LINEAR-RAY'
 	if(kwds['coords'].lower() == 'pt'):
-		print txtpt
+		print (txtpt)
 	if(kwds['coords'].lower() == 'ea'):
-		print txtea
+		print (txtea)
 	if(kwds['coords'].lower() == 'ha'):
-		print txtha
+		print (txtha)
 	if(kwds['coords'].lower() == 'lr'):
-		print txtlr
+		print (txtlr)
 
-	if kwds.has_key('coords'):
+	if 'coords' in kwds:
 		if(kwds['coords'].lower() == 'pt'):
 			arg = Js['jacobian']/ x**2
 		if(kwds['coords'].lower() == 'ea'):
@@ -855,9 +855,9 @@ def change_theta_coordinate(x,z,thev,psiv,**kwds):
 	#--- compute integral of dthe2 and normalize range to [0,1]
 	integ	= np.ones((nt,nr),dtype='float64')
 	ninteg	= np.ones((nt,nr),dtype='float64')
-	for i in xrange(irmin,nr-1):
+	for i in range(irmin,nr-1):
 		integ[:,i]  = antideriv1(thev,arg[:,i])
-	for i in xrange(irmin,nr-1):
+	for i in range(irmin,nr-1):
 		ninteg[:,i] = np.abs(integ[:,i])/np.max(np.abs(integ[:,i]))
 
 	#--- generate uniform theta arrays using new number of theta points
@@ -872,15 +872,15 @@ def change_theta_coordinate(x,z,thev,psiv,**kwds):
 
 	#--- Interpolate normalized theta2(theta1) onto new uniform theta1 grid
 	#FOR i=irmin,nr-1 DO newthen[*,i] = SPLINE(ninteg[*,i],tnorm,tnewn)
-	for i in xrange(irmin,nr-1):
+	for i in range(irmin,nr-1):
 		newthenspline = scinterp.UnivariateSpline(tnorm,ninteg[:,i])
 		newthen[:,i] = newthenspline(tnewn)
 
 	#--- Interpolate x,z(theta1) onto normalized theta2(theta1) grid
-	for i in xrange(irmin,nr-1):
+	for i in range(irmin,nr-1):
 		newxinterp = scinterp.interp1d(tnorm,x[:,i])
 		newx[:,i] = newxinterp(newthen[:,i])
-	for i in xrange(irmin,nr-1):
+	for i in range(irmin,nr-1):
 		newzinterp = scinterp.interp1d(tnorm,z[:,i])
 		newz[:,i]  = newzinterp(newthen[:,i])
 	#FOR i=1,nr-1 DO newx[*,i]    = INTERPOL(x[*,i],tnorm,newthen[*,i],/SPLINE)
@@ -904,7 +904,7 @@ def change_theta_coordinate(x,z,thev,psiv,**kwds):
 
 	#--- Compute q / F where F = R*Bt
 	Jsn = flux_coordinate_jacobian(newx,newz,newtheta,psiv)
-	for i in xrange(nr-1):
+	for i in range(nr-1):
 		qoverF[i] = definteg1(tnewn,Jsn['jacobian'][:,i]/newx[:,i]**2)
 
 	#--- Extrapolate q / F into the axis
@@ -950,10 +950,10 @@ def iterate_flux_coordinates(xfit,zfit,xaxis2d,zaxis2d,pd,psia,psib,rhonorm,mite
 
 		# SQRT(psi) is best for interpolation
 		rrpfn = np.sqrt(np.float64(np.abs(rpfn)))
-		for i in xrange(nthe-1):
+		for i in range(nthe-1):
 			ndxfitinterp = scinterp.interp1d(dxfit[i,:],rrpfn[i,:])
 			ndxfit[i,:] = ndexfitinterp(rhonorm)
-		for i in xrange(nthe-1):
+		for i in range(nthe-1):
 			ndzfitinterp = scinterp.interp1d(dzfit[i,:],rrpfn[i,:])
 			ndzfit[i,:] = ndzfitinterp(rhonorm)
 
@@ -971,7 +971,7 @@ def iterate_flux_coordinates(xfit,zfit,xaxis2d,zaxis2d,pd,psia,psib,rhonorm,mite
 		radius = np.sqrt((xfit-zaxis2d)**2+(zfit-zaxis2d)**2)
 		ratio  = delta/(radius+small)
 		mratio = ratio.max()
-		print 'Iteration #, convergence error = {:3i},{:12.6e}'.format(iters,mratio)
+		print ('Iteration #, convergence error = {:3i},{:12.6e}'.format(iters,mratio))
 		if((mratio > dconv) and (iters < miters)):
 			nugget = 1
 		else:
@@ -1006,19 +1006,19 @@ def compute_flux_coords(psidata,r_bnd,z_bnd,r_axis,z_axis,radexp0,radexp1,
 
 	#--- Flux fraction
 	dfluxfrac	= fluxfrac
-	if(kwds.has_key('rhomax')):
+	if 'rhomax' in kwds:
 		dfluxfrac = kwds['rhomax']**2
 
 	#--- Coordinate system choice
 	defcor	= 'lr'
-	if(kwds.has_key('coords')):
+	if 'coords' in kwds:
 		defcor = kwds['coords']
 
 	#--- Initialize data
 	nrad	= np.int32(nradius)
 	nthe	= np.int32(ntheta)
 
-	if(kwds.has_key('empty')):
+	if 'empty' in kwds:
 		xfit	= np.zeros((nthe,nrad),dtype='float64')
 		zfit	= np.zeros((nthe,nrad),dtype='float64')
 		psifit	= np.zeros(nrad,dtype='float64')
@@ -1036,7 +1036,7 @@ def compute_flux_coords(psidata,r_bnd,z_bnd,r_axis,z_axis,radexp0,radexp1,
 
 		#--- rho minimum
 		umin = np.float64(0.0)
-		if(kwds.has_key('rhomin')):
+		if 'rhomin' in kwds:
 			umin = (kwds['rhomin']**2/dfluxfrac)^(1/radexp[0])
 		unitv	= unitv0*(1.0-umin)+umin
 		#vector	= unitv0
@@ -1061,7 +1061,7 @@ def compute_flux_coords(psidata,r_bnd,z_bnd,r_axis,z_axis,radexp0,radexp1,
 		psia	= psias['psi'][0]
 
 		#--- Fit the EFIT boundary from [0,2*PI] with nthe theta points
-		iuni	= np.int32(kwds.has_key('full_bnd'))
+		iuni	= np.int32('full_bnd' in kwds)
 		unib	= 1-iuni
 		fb	= fit_boundary(rb,zb,nthe,uniform=unib)
 		xb_fit	= fb['xfit']
@@ -1092,11 +1092,11 @@ def compute_flux_coords(psidata,r_bnd,z_bnd,r_axis,z_axis,radexp0,radexp1,
 		rnorm	= np.zeros((nthe,nrad),dtype='float32')
 		rho		= np.zeros((nthe,nrad),dtype='float32')
 		angle	= np.zeros((nthe,nrad),dtype='float32')
-		for i in xrange(nthe-1):
+		for i in range(nthe-1):
 			rnorm[i,:]	= rnorm0
-		for i in xrange(nrad-1):
+		for i in range(nrad-1):
 			rho[:,i]	= ra['rho']
-		for i in xrange(nrad-1):
+		for i in range(nrad-1):
 			angle[:,i]	= ra['angle']
 		xfit = xaxis2d+rnorm*rho*np.cos(angle)
 		zfit = zaxis2d+rnorm*rho*np.sin(angle)
@@ -1106,7 +1106,7 @@ def compute_flux_coords(psidata,r_bnd,z_bnd,r_axis,z_axis,radexp0,radexp1,
 		#
 		#  NEED TO FIX THIS - DOESN'T WORK FOR HAMADA, PEST-THETA...
 		#
-		for ifc in xrange(0):
+		for ifc in range(0):
 			xfit,zfit = iterate_flux_coordinates(xfit,zfit,xaxis2d,zaxis2d,pd,psia,psib,
 				rhonorm,miters,dconv)
 
@@ -1129,7 +1129,7 @@ def compute_flux_coords(psidata,r_bnd,z_bnd,r_axis,z_axis,radexp0,radexp1,
 	tstop	= systime.time()
 	dtime	= str(tstop-tstart)
 	dtime = dtime[:-2]
-	print'Flux coordinates computed in '+dtime+' seconds.'
+	print('Flux coordinates computed in '+dtime+' seconds.')
 	return	struc
 
 #------------------------------------------------------------------------
@@ -1150,11 +1150,11 @@ def efitg_flux_coords(g,*quiet,**kwds):
 	dconv	= 1.0e-4		# flux surface convergence parameter
 	miters	= 10			# maximum number of iterations
 	defcor	= 'lr'			# default coordinate system
-	if kwds.has_key('fc'):
+	if 'fc' in kwds:
 		fc	= kwds['fc']	# pass flux coordinates through keyword
 
 	deindex	= np.int32(0)
-	if kwds.has_key('eindex'):
+	if 'eindex' in kwds:
 		deindex = np.int32(kwds['eindex'])
 
 	#--- Execution time
@@ -1165,33 +1165,33 @@ def efitg_flux_coords(g,*quiet,**kwds):
 	if not quiet:
 		iverbose  = 1
 
-	if kwds.has_key('rexp0'):
+	if 'rexp0' in kwds:
 		radexp0 = kwds['rexp0']
-	if kwds.has_key('rexp1'):
+	if 'rexp1' in kwds:
 		radexp1 = kwds['rexp1']
-	if kwds.has_key('psifrac'):
+	if 'psifrac' in kwds:
 		flxfrac = kwds['psifrac']
 
-	if kwds.has_key('nr'):
+	if 'nr' in kwds:
 		nrad = kwds['nr']
-	if kwds.has_key('nt'):
+	if 'nt' in kwds:
 		nthe = kwds['nt']
-	if kwds.has_key('ctol'):
+	if 'ctol' in kwds:
 		dconv = kwds['ctol']
-	if kwds.has_key('maxit'):
+	if 'maxit' in kwds:
 		miters = kwds['maxit']
-	if kwds.has_key('coords'):
+	if 'coords' in kwds:
 		defcor = kwds['coords']
 
-	if kwds.has_key('linear'):
+	if 'linear' in kwds:
 		radexp0 = 1.0
 		radexp1 = 1.0
-		print '--> Radial coordinate is linear in poloidal flux.'
+		print ('--> Radial coordinate is linear in poloidal flux.')
 
 	stext	= str(g['shot']).strip()
 	stime	= stext+', t='+str(g['time'])+' msec...'
 	if iverbose:
-		print 'Computing flux coordinate solution for shot='+stime
+		print ('Computing flux coordinate solution for shot='+stime)
 
 	#--- R and Z of magnetic axis from EFIT
 	xaxis	= np.float64(g['rmaxis'])
@@ -1213,7 +1213,7 @@ def efitg_flux_coords(g,*quiet,**kwds):
 
 	#--- Set the edge pressure value if this keyword is set
 	n	= np.size(p_)
-	if kwds.has_key('pedge'):
+	if 'pedge' in kwds:
 		p_ = (p_ - p_[n-1]) + kwds['pedge']*np.ones(n)
 
 	# Compute EFIT psi
@@ -1229,13 +1229,13 @@ def efitg_flux_coords(g,*quiet,**kwds):
 
 	# Change flux fraction based on specified q-edge?
 	# If so, use largest value allowable between [0,1]
-	if kwds.has_key('qedge'):
+	if 'qedge' in kwds:
 		flxfrcqinterp = scinterp.UnivariateSpline(psien,np.abs(q_))
 		flxfrcq = flxfrcqinterp(kwds['qedge'])
 		flxfrcq = min(flxfrcq,0.99990)
 		flxfrcq = max(flxfrcq,0.00100)
 		flxfrac = min(flxfrac,flxfrcq)
-		print 'Flux fraction changed to '+str(flxfrac)+' to attempt match of specified edge q = {}'.format(kwds['qedge'])
+		print ('Flux fraction changed to '+str(flxfrac)+' to attempt match of specified edge q = {}'.format(kwds['qedge']))
 
 	#--- Compute the flux coordinates X,Z and related quantities
 	ps	= psistruc(g)
@@ -1249,19 +1249,19 @@ def efitg_flux_coords(g,*quiet,**kwds):
 	ipsnbch	= np.where((psnbchk.any() < psnbtol) and jpsnbch)
 
 	if(ipsnbch[0] != -1):
-		print 'Maximum psin error on boundary = {}'.format(psnbchk.max())
+		print ('Maximum psin error on boundary = {}'.format(psnbchk.max()))
 		rbe	= rbe[ipsnbch]
 		zbe	= zbe[ipsnbch]
 
-	if (kwds.has_key('fc') == False):
+	if 'fc' not in kwds:
 		kwds2={}
-		if(kwds.has_key('coords')):
+		if 'coords' in kwds:
 			kwds2['coords']=defcor
-		if(kwds.has_key('rhomin')):
+		if 'rhomin' in kwds:
 			kwds2['rhomin']=kwds['rhomin']
-		if(kwds.has_key('rhomax')):
+		if 'rhomax' in kwds:
 			kwds2['rhomax']=kwds['rhomax']
-		if(kwds.has_key('full_bnd')):
+		if 'full_bnd' in kwds:
 			kwds2['full_bnd']=kwds['full_bnd']
 		fc = compute_flux_coords(pd,rbe,zbe,xaxis,zaxis,radexp0,radexp1,
 									flxfrac,nrad,nthe,rscale,dconv,miters,
@@ -1297,21 +1297,21 @@ def efitg_flux_coords(g,*quiet,**kwds):
 	pp	= F.copy()
 	p	= F.copy()
 	q	= F.copy()
-	for i in xrange(nt-1):
+	for i in range(nt-1):
 		F[i,:]   = F_v
-	for i in xrange(nt-1):
+	for i in range(nt-1):
 		FFp[i,:] = FFp_v
-	for i in xrange(nt-1):
+	for i in range(nt-1):
 		pp[i,:]  = pp_v
-	for i in xrange(nt-1):
+	for i in range(nt-1):
 		q[i,:]   = q_v
-	for i in xrange(nt-1):
+	for i in range(nt-1):
 		p[i,:]   = p_v
 	Fp	= FFp/F
 
 	#--- Re-compute q-profile from EFIT
 	qctc	= np.zeros((nt,nr),dtype='float64')
-	for i in xrange(nt-1):
+	for i in range(nt-1):
 		qctc[i,:] = qoverF * F_v
 	q_orig	= q
 	q	= qctc
@@ -1328,7 +1328,7 @@ def efitg_flux_coords(g,*quiet,**kwds):
 
 	#-- Compute poloidal arc-length
 	parclen = np.zeros(nr,dtype='float64')
-	for j in xrange(nt-2):
+	for j in range(nt-2):
 		dx	= x[j+1,:]-x[j,:]
 		dz	= z[j+1,:]-z[j,:]
 		parclen = parclen + np.sqrt(dx**2+dz**2)
@@ -1349,12 +1349,12 @@ def efitg_flux_coords(g,*quiet,**kwds):
 
 	#--- 2D arrays of normalized flux and "helically distorted" normalized flux
 	psin	= np.zeros((nt,nr),dtype='float32')
-	for i in xrange(nt-1):
+	for i in range(nt-1):
 		psin[i,:] = psinorm
 	psinh	= psin
 
 	#--- Force psi to be constant on a surface of constant flux
-	for i in xrange(nr-1):
+	for i in range(nr-1):
 		psi[:,i] = np.mean(psi[0:nt-2,i])*np.ones(nt)
 
 	#--- Compute B-field arrays
@@ -1371,7 +1371,7 @@ def efitg_flux_coords(g,*quiet,**kwds):
 
 	#--- Define volume
 	dVdpsi	= np.zeros(nr,dtype='float64')
-	for i in xrange(nr-1):
+	for i in range(nr-1):
 		dVdpsi[i] = 2.0*np.pi*definteg1(the,jac[:,i])
 	volume	= antideriv1(psi[0,:].squeeze(),dVdpsi)
 
@@ -1391,11 +1391,11 @@ def efitg_flux_coords(g,*quiet,**kwds):
 	ptarg	= jac / x**2
 	integ	= np.zeros((nt,nr),dtype='float64')
 	ninteg	= np.zeros((nt,nr),dtype='float64')
-	for i in xrange(nr-1):
+	for i in range(nr-1):
 		integ[:,i] = antideriv1(the,ptarg[:,i])
-	for i in xrange(nr-1):
+	for i in range(nr-1):
 		ninteg[:,i] = np.abs(integ[:,i])/np.max(np.abs(integ[:,i]))
-	print integ.max()
+	print (integ.max())
 	ptheta 	= np.float64(2.0*np.pi)*ninteg
 
 	#--- Compute flux surface averages of J.B (F' and p' components)
@@ -1430,17 +1430,17 @@ def efitg_flux_coords(g,*quiet,**kwds):
 	#--- Min and max R on each flux surface
 	Rmin	= null_nr
 	Rmax	= null_nr
-	for j in xrange(nr-1):
+	for j in range(nr-1):
 		Rmin[j] = R[:,j].min()
-	for j in xrange(nr-1):
+	for j in range(nr-1):
 		Rmax[j] = R[:,j].max()
 
 	#--- Min and max B on each flux surface
 	Bmin	= null_nr
 	Bmax	= null_nr
-	for j in xrange(nr-1):
+	for j in range(nr-1):
 		Bmin[j] = B[:,j].min()
-	for j in xrange(nr-1):
+	for j in range(nr-1):
 		Bmax[j] = B[:,j].max()
 
 	#--- Inverse aspect ratio profiles
@@ -1463,11 +1463,11 @@ def efitg_flux_coords(g,*quiet,**kwds):
 	saB2	= fs_average_array(   B**2,jac,the)
 
 	#--- Skip time-dependent stuff?
-	if kwds.has_key('fast'):
+	if 'fast' in kwds:
 		tstop	= systime.time()
 		dtime	= str(tstop-tstart)[:-2]
 		if iverbose:
-			print '--> Full solution computed in '+dtime+' seconds.'
+			print ('--> Full solution computed in '+dtime+' seconds.')
 
 		return {'time':time,'shot':g['shot'],'eindex':deindex,'x':x,'y':y,
 					'z':z,'r':R,'xb':xb,'yb':yb,'zb':zb,'rb':Rb,'psi':psi,
@@ -1493,7 +1493,7 @@ def efitg_flux_coords(g,*quiet,**kwds):
 	dBrdt	= np.zeros((nt,nr),dtype='float64')
 	dBphidt	= np.zeros((nt,nr),dtype='float64')
 
-	if kwds.has_key('field_subset'):
+	if 'field_subset' in kwds:
 		fs 	= field_subset
 		x1v	= fs.r[:,0].squeeze()
 		x2v	= fs.z[0,:].squeeze()
@@ -1508,7 +1508,7 @@ def efitg_flux_coords(g,*quiet,**kwds):
 		dBint	= auto_interpolate_U(x1d,z1d,Us)
 		# integrand
 		intgr	= (dBint['Ui']/x1d).reshape(nt,nr)*jac
-		for i in xrange(nt-1):
+		for i in range(nt-1):
 			Epol[i,:] = antideriv1(psiv,intgr[i,:])
 		Epol	= Epol/(jac*Bpol)
 		dBphidt	= dBint['Ui'].reshape(nt,nr)
@@ -1543,7 +1543,7 @@ def efitg_flux_coords(g,*quiet,**kwds):
 	tstop	= systime.time()
 	dtime	= str(tstop-tstart)[:-2]
 	if iverbose:
-		print '--> Full solution computed in '+dtime+' seconds.'
+		print ('--> Full solution computed in '+dtime+' seconds.')
 
 	return {'time':time,'shot':g['shot'],'eindex':deindex,'x':x,
 				'y':y,'z':z,'r':r,'xb':xb,'yb':yb,'zb':zb,'rb':rb,

@@ -24,7 +24,7 @@ def read(f):
 
     """
 
-    if isinstance(f, basestring):
+    if isinstance(f, str):
         # If the input is a string, treat as file name
         with open(f) as fh: # Ensure file is closed
             return read(fh) # Call again with file object
@@ -149,7 +149,7 @@ def write(f, data):
 
     """
 
-    if isinstance(f, basestring):
+    if isinstance(f, str):
         # If the input is a string, treat as file name
         with open(f, "w") as fh: # Ensure file is closed
             return write(fh, data) # Call again with file object

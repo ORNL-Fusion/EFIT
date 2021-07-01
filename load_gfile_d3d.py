@@ -273,15 +273,15 @@ def read_g_file_mds(shot, time, tree='EFIT01', exact=False, connection=None,
 # 5 columns, 9 digit float with exponents and no spaces in front of negative numbers
 def write_array(x, f):
     N = len(x)
-    rows = N/5  # integer division
+    rows = int(N/5)  # integer division
     rest = N - 5*rows
 
-    for i in xrange(rows):
-        for j in xrange(5): f.write('% .9E'%(x[i*5 + j]))
+    for i in range(rows):
+        for j in range(5): f.write('% .9E'%(x[i*5 + j]))
         f.write('\n')
 
     if(rest > 0):
-        for j in xrange(rest): f.write('% .9E'%(x[rows*5 + j]))
+        for j in range(rest): f.write('% .9E'%(x[rows*5 + j]))
         f.write('\n')
 
 

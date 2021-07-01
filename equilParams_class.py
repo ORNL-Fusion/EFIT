@@ -3,9 +3,10 @@ Interface to read EFIT g-file equilibria.
 Author: A. Wingen
 First Implemented: Sep. 10. 2012
 Please report bugs to: wingen@fusion.gat.com
+Python 3 version
 """
-_VERSION = 4.3
-_LAST_UPDATE = 'Sep 30. 2020'
+_VERSION = 5.0
+_LAST_UPDATE = 'July 1. 2021'
 
 import os
 import numpy as np
@@ -764,7 +765,7 @@ class equilParams:
             Bp_mid = self.BpFunc.ev(Rmid,self.zmaxis)
             
             d = self.strikeLines()
-            if not d.has_key('R' + target): 
+            if ('R' + target) not in d: 
                 print('Unkown target in fluxExpansion')
                 target = 'in'
             Rdiv = d['R' + target]
@@ -1109,7 +1110,7 @@ class equilParams:
         # 5 columns, 9 digit float with exponents and no spaces in front of negative numbers
         def _write_array(self, x, f):
             N = len(x)
-            rows = N/5  # integer division
+            rows = int(N/5)  # integer division
             rest = N - 5*rows
 
             for i in range(rows):

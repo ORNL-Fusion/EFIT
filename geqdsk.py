@@ -145,7 +145,7 @@ class Geqdsk:
         return self.data
 
     def getAllVars(self):
-        return self.data.keys()
+        return list(self.data.keys())
 
     def get(self, varname):
         return self.data[varname.lower()][0]
