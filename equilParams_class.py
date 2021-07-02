@@ -13,7 +13,6 @@ import numpy as np
 import scipy.integrate as integ
 import scipy.interpolate as interp
 import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning) 
 
 from . import geqdsk as gdsk	# this is a relative import
 from . import equilibrium as eq
@@ -413,6 +412,8 @@ class equilParams:
         # --------------------------------------------------------------------------------
         # Flux surface enclosed 2D-Volume (Area inside surface) and derivative (psi)
         def volume2D(self, FluxSurfList = None):
+            warnings.filterwarnings("ignore", category=DeprecationWarning) 
+
             V = np.zeros(self.nw)
             psi = self.PSIdict['psiN1D']
 
@@ -917,7 +918,7 @@ class equilParams:
 
                 # Compute convergence error
                 delta = np.sqrt((R - R_old )**2 + (Z - Z_old)**2)
-                ratio = (delta[-idx]/(r[-idx] + 1.0e-20)).max()
+                ratio = (delta[np.invert(idx)]/(r[np.invert(idx)] + 1.0e-20)).max()
 
                 # no convergence check
                 N += 1
