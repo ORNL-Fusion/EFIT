@@ -12,6 +12,8 @@ import os
 import numpy as np
 import scipy.integrate as integ
 import scipy.interpolate as interp
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning) 
 
 from . import geqdsk as gdsk	# this is a relative import
 from . import equilibrium as eq

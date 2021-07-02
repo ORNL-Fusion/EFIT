@@ -27,7 +27,7 @@ class Geqdsk:
         open geqdsk file and parse its content
         """
 
-        lines = open(filename, 'r').readlines()
+        with open(filename, 'r') as f: lines = f.readlines()
 
         # first line
         # m = re.search(r'^\s*([\w\s\_\/\#]+)\s+\d+\s+(\d+)\s+(\d+)\s*$', lines[0])
