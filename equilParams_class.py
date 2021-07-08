@@ -412,8 +412,6 @@ class equilParams:
         # --------------------------------------------------------------------------------
         # Flux surface enclosed 2D-Volume (Area inside surface) and derivative (psi)
         def volume2D(self, FluxSurfList = None):
-            warnings.filterwarnings("ignore", category=DeprecationWarning) 
-
             V = np.zeros(self.nw)
             psi = self.PSIdict['psiN1D']
 
@@ -422,7 +420,8 @@ class equilParams:
 
             for i in range(1, self.nw):
                 rsq = (FluxSurfList[i]['Rs'] - self.rmaxis)**2 + (FluxSurfList[i]['Zs'] - self.zmaxis)**2
-                V[i] = 0.5 * integ.simps(rsq, self.theta)
+                try: V[i] = 0.5 * integ.simps(rsq, self.theta)
+                except: V[i] = 0.5 * integ.trapz(rsq, self.theta)
 
             # dV/dpsi
             dV = np.zeros(self.nw)
