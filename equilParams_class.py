@@ -585,6 +585,7 @@ class equilParams:
             for i in range(1,Nwall):
                 Swall[i] = Swall[i-1] + np.sqrt((Rwall[i] - Rwall[i-1])**2 + (Zwall[i] - Zwall[i-1])**2)    #length of curve in m
                 if ((Zwall[i]*Zwall[i-1] <= 0) & (Rwall[i] < self.g['R0'])):
+                    if (Zwall[i-1] == Zwall[i]): continue
                     t = Zwall[i-1]/(Zwall[i-1] - Zwall[i])
                     S0 = Swall[i-1] + t*(Swall[i] - Swall[i-1])
                     if (Zwall[i] < Zwall[i-1]): dir = 1 # ccw
