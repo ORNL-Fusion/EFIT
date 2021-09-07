@@ -558,9 +558,9 @@ class equilParams:
             plt.plot(self.g['wall'][:,0],self.g['wall'][:,1], 'k--')
             plt.xlim(self.g['wall'][:,0].min()*0.97, self.g['wall'][:,0].max()*1.03)
             plt.ylim(self.g['wall'][:,1].min()*1.03, self.g['wall'][:,1].max()*1.03)
-            plt.axes().set_aspect('equal')
             plt.xlabel('R [m]')
             plt.ylabel('Z [m]')
+            plt.gca().set_aspect('equal')
             plt.title('Shot: ' + str(self.g['shot']) + '   Time: ' + str(self.g['time']) + ' ms', fontsize = 18)
 
         # --------------------------------------------------------------------------------
