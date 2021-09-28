@@ -95,7 +95,8 @@ class equilParams:
 
             psiN2D = self.PSIdict['psiN_2D'].flatten()
             idx = np.where(psiN2D <= 1)[0]
-            Fpol2D = np.ones(psiN2D.shape) * self.data.get('bcentr') * abs(self.data.get('rcentr'))
+            Fpol_sep = self.PROFdict['ffunc'](1.0)   #self.data.get('bcentr') * abs(self.data.get('rcentr'))
+            Fpol2D = np.ones(psiN2D.shape) * Fpol_sep
             Fpol2D[idx] = self.PROFdict['ffunc'](psiN2D[idx])
             Fpol2D = Fpol2D.reshape(self.PSIdict['psiN_2D'].shape)
             self.Bt_2D = Fpol2D / self.RZdict['Rs2D']
