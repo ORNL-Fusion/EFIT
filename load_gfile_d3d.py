@@ -164,7 +164,7 @@ def read_g_file_mds(shot, time, tree='EFIT01', exact=False, connection=None,
 
     # Connect to server, open tree and go to g-file
     if connection is None:
-        connection = MDSplus.Connection('atlas.gat.com')
+        connection = MDSplus.Connection('localhost')
     connection.openTree(tree, shot)
     base = 'RESULTS:GEQDSK:'
 
