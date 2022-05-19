@@ -33,16 +33,20 @@ class equilParams:
                 idx *= -1
                 gpath = gfileNam[0:idx - 1]  # path without a final '/'
                 gfile = gfileNam[idx::]
-            idx = gfile.find('.')
-            fmtstr = '0' + str(idx-1) + 'd'
-            shot, time = int(gfile[1:idx]), gfile[idx+1::]
-            if '.' in time:
-                idx = time.find('.')
-                time = time[0:idx]
-            if '_' in time:
-                idx = time.find('_')
-                time = time[0:idx]
-            time = int(time)
+            
+            try:
+                idx = gfile.find('.')
+                fmtstr = '0' + str(idx-1) + 'd'
+                shot, time = int(gfile[1:idx]), gfile[idx+1::]
+                if '.' in time:
+                    idx = time.find('.')
+                    time = time[0:idx]
+                if '_' in time:
+                    idx = time.find('_')
+                    time = time[0:idx]
+                time = int(time)
+            except:
+                time,shot,fmtstr = 0,0,'06d'
                 
             if (not os.path.isfile(gfileNam)) and (tree is None):
                 raise NameError('g-file not found -> Abort!')
