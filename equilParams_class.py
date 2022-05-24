@@ -548,25 +548,34 @@ class equilParams:
                     'jR2D':jR, 'jZ2D':jZ, 'jtor2D':jtor}
                     
         # --------------------------------------------------------------------------------
-        def plot(self):
+        def plot(self, fig = None, c = None):
+            """
+            fig: integer number of figure window to use, e.g. 1
+            c: string of color code, e.g. 'k' or 'r'
+            """
             import matplotlib.pyplot as plt
+            if c is None: c = 'k'
             R1d = self.RZdict['Rs1D']
             Z1d = self.RZdict['Zs1D']
             Rs, Zs = np.meshgrid(R1d, Z1d)
             levs = np.append(0.01, np.arange(0.1, 1.1, 0.1))
             
-            plt.figure(figsize = (6,10))
-            plt.plot(self.rmaxis, self.zmaxis, 'kx', markersize = 5, linewidth = 2)
-            cs1 = plt.contour(Rs, Zs, self.PSIdict['psiN_2D'], levs, colors = 'k')
+            if fig is None: plt.figure(figsize = (6,10))
+            else: plt.figure(fig)
+            
+            plt.plot(self.rmaxis, self.zmaxis, c+'x', markersize = 5, linewidth = 2)
+            cs1 = plt.contour(Rs, Zs, self.PSIdict['psiN_2D'], levs, colors = c)
             cs1.collections[0].set_label('EFIT')
-            plt.plot(self.g['lcfs'][:,0],self.g['lcfs'][:,1], 'k-', lw = 2, label = 'EFIT Bndy')
-            plt.plot(self.g['wall'][:,0],self.g['wall'][:,1], 'k--')
-            plt.xlim(self.g['wall'][:,0].min()*0.97, self.g['wall'][:,0].max()*1.03)
-            plt.ylim(self.g['wall'][:,1].min()*1.03, self.g['wall'][:,1].max()*1.03)
-            plt.xlabel('R [m]')
-            plt.ylabel('Z [m]')
-            plt.gca().set_aspect('equal')
-            plt.title('Shot: ' + str(self.g['shot']) + '   Time: ' + str(self.g['time']) + ' ms', fontsize = 18)
+            plt.plot(self.g['lcfs'][:,0],self.g['lcfs'][:,1], c, lw = 2, label = 'EFIT Bndy')
+            
+            if fig is None:
+                plt.plot(self.g['wall'][:,0],self.g['wall'][:,1], 'k--')
+                plt.xlim(self.g['wall'][:,0].min()*0.97, self.g['wall'][:,0].max()*1.03)
+                plt.ylim(self.g['wall'][:,1].min()*1.03, self.g['wall'][:,1].max()*1.03)
+                plt.xlabel('R [m]')
+                plt.ylabel('Z [m]')
+                plt.gca().set_aspect('equal')
+                plt.title('Shot: ' + str(self.g['shot']) + '   Time: ' + str(self.g['time']) + ' ms', fontsize = 18)
 
         # --------------------------------------------------------------------------------
         def length_along_wall(self):
