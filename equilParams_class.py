@@ -36,8 +36,8 @@ class equilParams:
             
             try:
                 idx = gfile.find('.')
-                fmtstr = '0' + str(idx-1) + 'd'
-                shot, time = int(gfile[1:idx]), gfile[idx+1::]
+                fmtstr = '0' + str(idx - 1) + 'd'
+                shot, time = int(gfile[1:idx]), gfile[idx + 1::]
                 if '.' in time:
                     idx = time.find('.')
                     time = time[0:idx]
@@ -46,8 +46,8 @@ class equilParams:
                     time = time[0:idx]
                 time = int(time)
             except:
-                time,shot,fmtstr = 0,0,'06d'
-                
+                time, shot, fmtstr = 0, 0, '06d'
+
             if (not os.path.isfile(gfileNam)) and (tree is None):
                 raise NameError('g-file not found -> Abort!')
 
@@ -88,6 +88,7 @@ class equilParams:
             self.PROFdict = self.profiles()
             self.RZdict = self.RZ_params()
             self.PSIdict = self.getPsi()
+            self.PHIdict = self.getTorPsi()
 
             # ---- more Variables ----
             self.dpsidZ, self.dpsidR = np.gradient(self.PSIdict['psi2D'], self.RZdict['dZ'],
@@ -132,7 +133,7 @@ class equilParams:
                       'Nlcfs': self.data.get('nbbbs'), 'Nwall': self.data.get('limitr'),
                       'lcfs': np.vstack((self.data.get('rbbbs'), self.data.get('zbbbs'))).T,
                       'wall': np.vstack((self.data.get('rlim'), self.data.get('zlim'))).T,
-                      'psi': self.PSIdict['psiN1D'], 'Rsminor': self.Rsminor
+                      'psi': self.PSIdict['psi1D'], 'Rsminor': self.Rsminor
                       }
                       
             self.Swall, self.Swall_max = self.length_along_wall()
@@ -177,7 +178,7 @@ class equilParams:
         # so: psipol = psi1D = 2pi * (self.siBry-self.siAxis) * psiN1D
         def getPsi(self):
             psiN1D = np.linspace(0.0, 1.0, self.nw)
-            psi1D = 2*np.pi * (self.siBry - self.siAxis) * psiN1D
+            psi1D = 2 * np.pi * (self.siBry - self.siAxis) * psiN1D
             psi2D = self.data.get('psirz')
             psiN_2D = (psi2D - self.siAxis) / (self.siBry - self.siAxis)
             # psiN_2D[np.where(psiN_2D > 1.2)] = 1.2
@@ -489,7 +490,7 @@ class equilParams:
         # returns arrays R and Z of N points along psi = const. surface
         def flux_surface(self, psi0, N, theta=None):
             if (theta is None):
-                theta = np.linspace(0, 2*np.pi, N + 1)[0:-1]
+                theta = np.linspace(0, 2 * np.pi, N + 1)[0:-1]
             else:
                 N = len(theta)
 
@@ -508,14 +509,14 @@ class equilParams:
             for i in range(N):
                 r[i] = self.__bisec__(psi0, theta[i], b=rmax)
 
-            R = r*np.cos(theta) + self.rmaxis
-            Z = r*np.sin(theta) + self.zmaxis
+            R = r * np.cos(theta) + self.rmaxis
+            Z = r * np.sin(theta) + self.zmaxis
 
             return R, Z
 
         # --------------------------------------------------------------------------------
         def get_j2D(self):
-            mu0 = 4*np.pi*1e-7
+            mu0 = 4 * np.pi*1e-7
             jR = np.zeros(self.RZdict['Rs2D'].shape)
             jZ = np.zeros(self.RZdict['Rs2D'].shape)
             jtor = np.zeros(self.RZdict['Rs2D'].shape)
@@ -559,8 +560,8 @@ class equilParams:
             Z1d = self.RZdict['Zs1D']
             Rs, Zs = np.meshgrid(R1d, Z1d)
             levs = np.append(0.01, np.arange(0.1, 1.1, 0.1))
-            
-            if fig is None: plt.figure(figsize = (6,10))
+
+            if fig is None: plt.figure(figsize=(6, 10))
             else: plt.figure(fig)
             
             plt.plot(self.rmaxis, self.zmaxis, c+'x', markersize = 5, linewidth = 2)
@@ -764,7 +765,7 @@ class equilParams:
 
 
         # --------------------------------------------------------------------------------
-        def fluxExpansion(self, target = 'in'):
+        def fluxExpansion(self, target='in'):
             """
             Calculate flux expansion fx between outer midplane and wall
             target gives the strike line for which to get fx
@@ -782,7 +783,7 @@ class equilParams:
             Bp_mid = self.BpFunc.ev(Rmid,self.zmaxis)
             
             d = self.strikeLines()
-            if ('R' + target) not in d: 
+            if ('R' + target) not in d:
                 print('Unkown target in fluxExpansion')
                 target = 'in'
             Rdiv = d['R' + target]
