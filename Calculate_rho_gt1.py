@@ -24,7 +24,6 @@ def load_EFIT(shot, time, tree=None, server='atlas.gat.com'):
 
 
 def getRHON(paramDICT, Rin=0.0, Zin=0.0, psin=None):
-    pi = np.pi
 
     if psin is None:
         Rs, Zs = np.meshgrid(paramDICT['R'], paramDICT['Z'])
@@ -41,9 +40,9 @@ def getRHON(paramDICT, Rin=0.0, Zin=0.0, psin=None):
     dpsi = np.abs((paramDICT['psiAXIS'] - paramDICT['psiSEP']) / (paramDICT['NR'] - 1.))
 
     for j in range(int(paramDICT['NR'])):
-        tFlx = 2. * pi * (paramDICT['qprof1D'][j - 1] + paramDICT['qprof1D'][j]) * (dpsi / 2.)
+        tFlx = 2. * np.pi * (paramDICT['qprof1D'][j - 1] + paramDICT['qprof1D'][j]) * (dpsi / 2.)
         tFlux = tFlux + tFlx
-        rhox[j] = np.sqrt(tFlux / (pi * np.abs(paramDICT['Bt0'])))
+        rhox[j] = np.sqrt(tFlux / (np.pi * np.abs(paramDICT['Bt0'])))
 
 #   Normalize rho
     rhoN = rhox / np.max(rhox)
