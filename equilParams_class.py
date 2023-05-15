@@ -5,8 +5,8 @@ First Implemented: Sep. 10. 2012
 Please report bugs to: wingen@fusion.gat.com
 Python 3 version
 """
-_VERSION = 5.0
-_LAST_UPDATE = 'July 1. 2021'
+_VERSION = 5.01
+_LAST_UPDATE = 'May 15. 2023'
 
 import os
 import numpy as np
@@ -34,19 +34,24 @@ class equilParams:
                 gpath = gfileNam[0:idx - 1]  # path without a final '/'
                 gfile = gfileNam[idx::]
             
-            try:
+            if '_' in gfile:
+                gfileA,gfileB = gfile.split('_')
+                if '.' in gfileA:
+                    idx = gfileA.find('.')
+                    shot, time = gfileA[1:idx], gfileA[idx + 1::]
+                else:
+                    shot, time = gfileA[1::], gfileB
+                fmtstr = '0' + str(len(shot)) + 'd'
+            elif '.' in gfile:
                 idx = gfile.find('.')
-                fmtstr = '0' + str(idx - 1) + 'd'
-                shot, time = int(gfile[1:idx]), gfile[idx + 1::]
-                if '.' in time:
-                    idx = time.find('.')
-                    time = time[0:idx]
-                if '_' in time:
-                    idx = time.find('_')
-                    time = time[0:idx]
-                time = int(time)
-            except:
-                time, shot, fmtstr = 0, 0, '06d'
+                shot, time = gfile[1:idx], gfile[idx + 1::]
+                fmtstr = '0' + str(len(shot)) + 'd'
+            else:
+                shot, time, fmtstr = 0, 0, '06d'
+            try: shot = int(shot)
+            except: shot, fmtstr = 0, '06d'
+            try: time = float(time)
+            except: time = 0
 
             if (not os.path.isfile(gfileNam)) and (tree is None):
                 raise NameError('g-file not found -> Abort!')
