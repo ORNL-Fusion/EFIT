@@ -128,6 +128,24 @@ def plotProfile(psi, pro, save  = False, tag = None, rawdata = None):
 
 
 
+def write(p, filename):
+	"""
+	"""
+	fmt = '.6f'
+	keys = ['ne', 'te', 'ni', 'ti', 'nb', 'pb', 'ptot', 'omeg', 'omegp', 'omgvb', 'omgpp', 'omgeb', 'er', 'ommvb', 'ommpp', 'omevb', 'omepp', 'kpol', 'omghb', 'nz1', 'vtor1', 'vpol1']
+	#units= ['10^20/m^3','KeV','10^20/m^3','KeV','10^20/m^3','KPa','KPa','kRad/s','kRad/s','kRad/s','kRad/s','kRad/s','kV/m','','','','','km/s/T','','10^20/m^3','km/s','km/s']
+	
+	with open(filename,'w') as f:
+		for key in keys:
+			N = len(p[key]['psi'])
+			if(p[key]['units'] == 'None'): f.write(str(N) + ' psinorm ' + key + '() ' + 'd' + key + '/dpsiN' + '\n')
+			else: f.write(str(N) + ' psinorm ' + key + '(' + p[key]['units'] + ') ' + 'd' + key + '/dpsiN' + '\n')
+			for i in range(N): f.write(' ' + format(p[key]['psi'][i],fmt) + '   ' + format(p[key]['y'][i],fmt) + '   ' + format(p[key]['dydpsi'][i],fmt) + '\n')
+		f.write('3 N Z A of ION SPECIES\n')
+		for i in range(3): f.write(' ' + format(p['Z']['psi'][i],fmt) + '   ' + format(p['Z']['y'][i],fmt) + '   ' + format(p['Z']['dydpsi'][i],fmt) + '\n')
+
+
+
 # ----------------------------------------------------------------------------------------
 # --- Launch main() ----------------------------------------------------------------------
 if __name__ == '__main__':
