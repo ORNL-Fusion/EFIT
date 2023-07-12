@@ -138,7 +138,7 @@ class equilParams:
                       'Nlcfs': self.data.get('nbbbs'), 'Nwall': self.data.get('limitr'),
                       'lcfs': np.vstack((self.data.get('rbbbs'), self.data.get('zbbbs'))).T,
                       'wall': np.vstack((self.data.get('rlim'), self.data.get('zlim'))).T,
-                      'psi': self.PSIdict['psi1D'], 'Rsminor': self.Rsminor
+                      'psi': self.PSIdict['psi1D'], 'psiN': self.PSIdict['psiN1D'],'Rsminor': self.Rsminor
                       }
                       
             self.Swall, self.Swall_max = self.length_along_wall()
