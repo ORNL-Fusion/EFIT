@@ -623,11 +623,182 @@ class equilParams:
             return Swall, Swall_max
     
         # --------------------------------------------------------------------------------
+        def all_points_along_wall(self, swall, get_index = False, get_normal = False):
+            """
+            Compute matching point R,Z to given swall along wall
+            This uses vectorization instead of a for loop and is much faster than the old version
+            return R,Z
+            """
+            Rwall = self.g['wall'][:,0]
+            Zwall = self.g['wall'][:,1]
+    
+            isFloat = False
+            if isinstance(swall, float) | isinstance(swall, np.float64): 
+                swall = np.array([swall])
+                isFloat = True
+    
+            N = len(swall)
+            swall = swall % self.Swall_max
+            swall[swall < 0] += self.Swall_max;
+
+            idx = -np.ones(N, dtype = int)
+            use = np.ones(N, dtype = bool)
+            Nuse = N
+    
+            # locate discontinuity
+            idx_jump = np.where(np.abs(np.diff(self.Swall)) > 0.5*self.Swall_max)[0]
+            if len(idx_jump) == 0: idx_jump = 0
+            else: idx_jump = idx_jump[0] + 1
+
+            # This case occurs only when the wall does not have a point at inboard midplane
+            k = np.where((swall > self.Swall.max()) | (swall < self.Swall.min()))[0]
+            if len(k > 0):
+                idx[k] = idx_jump
+                use[k] = False
+                Nuse -= len(k)
+                swall_k = swall[k]
+                k2 = np.where(np.abs(swall_k - self.Swall[idx_jump]) > 0.5*self.Swall_max)[0]
+                if len(k2 > 0):
+                    swall_k2 = swall_k[k2]
+                    swall_k2[swall_k2 < self.Swall[idx_jump]] += self.Swall_max
+                    swall_k2[swall_k2 >= self.Swall[idx_jump]] -= self.Swall_max
+                    swall_k[k2] = swall_k2
+                swall[k] = swall_k
+    
+            # locate intervall that brackets swall
+            s0 = self.Swall[-1]
+            for i in range(len(self.Swall)):
+                if Nuse <= 0: break
+                idxu = -np.ones(Nuse, dtype = int)
+                uu = np.ones(Nuse, dtype = bool)
+        
+                s1 = self.Swall[i]
+                if (abs(s1 - s0) > 0.5*self.Swall_max): #skip the jump around Swall = 0 point
+                    s0 = s1
+                    continue
+        
+                k = np.where((s1 - swall[use]) * (s0 - swall[use]) <= 0)[0]
+                idxu[k] = i
+                uu[k] = False
+                Nuse -= len(k)
+        
+                idx[use] = idxu
+                use[use] = uu
+                s0 = s1
+
+            # set bracket points
+            R1,Z1,R2,Z2,i = Rwall[idx], Zwall[idx], Rwall[idx-1], Zwall[idx-1], 2
+            id = np.where((R1 == R2) & (Z1 == Z2))[0]
+            while len(id) > 0:      # if points are identical
+                R2[id],Z2[id] = Rwall[idx[id]-i], Zwall[idx[id]-i] # works for idx == 0 as well
+                id = np.where((R1 == R2) & (Z1 == Z2))[0]
+                i += 1
+
+            # linear interplation between bracket points
+            dR,dZ = (R2-R1), (Z2-Z1)
+            dx = np.sqrt(dR**2 + dZ**2)
+            dR,dZ = dR/dx, dZ/dx                # dR,dZ is normalized
+            x = np.abs(swall - self.Swall[idx])
+            R,Z = (R1 + x*dR), (Z1 + x*dZ)
+    
+            if isFloat: R,Z,dR,dZ,idx = R[0],Z[0],dR[0],dZ[0],idx[0]
+            if get_normal:  # get normal vector
+                return R,Z,-dZ,dR       # nR,nZ = -dZ, dR
+            else:
+                if get_index: return R,Z,idx
+                else: return R,Z 
+
+        # --------------------------------------------------------------------------------
+        def projectOnWall(self, Rx, Zx):
+            """
+            Tries to project a point Rx,Zx onto the wall.
+            The point R0,Z0 will be on the wall with s0 the wall coordinate.
+            The vector (Rx-R0,Zx-Z0) is then parallel to the wall normal nR0,nZ0 in R0,Z0 and 
+            has the length factor d. 
+            If multiple projections are possible, usually the closest one is found. 
+            This is not guaranteed and not checked.
+            For points that are not projectable, like no perpendicular projection exists, 
+            a wrong point R0,Z0 is returned. Such points have count == -1
+            Otherwise count shows the number of iterations needed to converge.
+            """
+            N = len(Rx)
+            use = np.ones(N, dtype = bool)
+            count = np.zeros(N)
+    
+            # find idx for Rwall,Zwall closest to Rx,Zx
+            sint = np.linspace(0, self.Swall_max, 300)[1:-1]
+            Swall = np.append(self.Swall,sint)
+            Swall.sort()
+            Rwall,Zwall,nRwall,nZwall = self.all_points_along_wall(Swall, get_normal = True)
+            
+            idx = np.zeros(N, dtype = int)
+            for i in range(N):
+                d2 = (Rwall - Rx[i])**2 + (Zwall - Zx[i])**2
+                idx[i] = d2.argmin()
+            idxstart = idx.copy()
+    
+            # Start point
+            Rs,Zs,s = Rwall[idx], Zwall[idx], Swall[idx]
+            nR,nZ = nRwall[idx], nZwall[idx]
+    
+            # Variables
+            R0,Z0,s0,nR0,nZ0,ds,d = np.zeros(N),np.zeros(N),np.zeros(N),np.zeros(N),np.zeros(N),np.zeros(N),np.zeros(N)
+            eps = np.ones(N)
+    
+            # Smart Search
+            for i in range(5):
+                count[use] += 1
+                ds[use] = -nZ[use]*(Rs[use]-Rx[use]) + nR[use]*(Zs[use]-Zx[use])
+                s0[use] = s[use] + ds[use]
+                R0[use],Z0[use],nR0[use],nZ0[use] = self.all_points_along_wall(s0[use], get_normal = True)
+                d[use] = -nR0[use]*(R0[use]-Rx[use]) - nZ0[use]*(Z0[use]-Zx[use])
+        
+                # convergence paramerter
+                eps[use] = (R0[use]+d[use]*nR0[use]-Rx[use])**2 + (Z0[use]+d[use]*nZ0[use]-Zx[use])**2
+        
+                # update use mask
+                use[eps < 1e-16] = False
+                if np.sum(use) == 0: break
+        
+                # update start values
+                Rs[use],Zs[use],s[use],nR[use],nZ[use] = R0[use],Z0[use],s0[use],nR0[use],nZ0[use]
+    
+            # Smart Search did not converge all, try systematic search for the remaining
+            if sum(use) > 0: 
+                shifts = [-1,1,-2,2,-3,3,-4,4,-5,5,-6,6,-7,7,-8,8,-9,9]
+                for i in range(18):
+                    # update start values
+                    count[use] += 1
+                    idxu = idxstart[use] + shifts[i]
+                    k = np.where(idxu >= len(Swall))
+                    if len(k) > 0: idxu[k] = idxu[k] - len(Swall)
+                    Rs[use],Zs[use],s[use] = Rwall[idxu], Zwall[idxu], Swall[idxu]
+                    nR[use],nZ[use] = nRwall[idxu], nZwall[idxu]
+            
+                    # get new point
+                    ds[use] = -nZ[use]*(Rs[use]-Rx[use]) + nR[use]*(Zs[use]-Zx[use])
+                    s0[use] = s[use] + ds[use]
+                    R0[use],Z0[use],nR0[use],nZ0[use] = self.all_points_along_wall(s0[use], get_normal = True)
+                    d[use] = -nR0[use]*(R0[use]-Rx[use]) - nZ0[use]*(Z0[use]-Zx[use])
+            
+                    # convergence paramerter
+                    eps[use] = (R0[use]+d[use]*nR0[use]-Rx[use])**2 + (Z0[use]+d[use]*nZ0[use]-Zx[use])**2
+        
+                    # update use mask
+                    use[eps < 1e-16] = False
+                    if np.sum(use) == 0: break
+            
+            count[use] = -1
+            return R0,Z0,s0,d,nR0,nZ0,count
+
+        # --------------------------------------------------------------------------------
         def point_along_wall(self, swall, get_index = False):
             """
+            DEPRECATED
             Compute matching point R,Z to given swall along wall
             return R,Z
             """
+            print('Deprecation Warning: Use self.all_points_along_wall() instead')
             Rwall = self.g['wall'][:,0]
             Zwall = self.g['wall'][:,1]
 
@@ -641,6 +812,7 @@ class equilParams:
 
             # locate intervall that brackets swall
             if ((swall > self.Swall.max()) | (swall < self.Swall.min())):
+                print('This should never happen')
                 idx = idx_jump;
                 if (np.abs(swall - self.Swall[idx]) > 0.5*self.Swall_max):
                     if (swall < self.Swall[idx]): swall += self.Swall_max
@@ -676,8 +848,9 @@ class equilParams:
             else: return p[0], p[1] # R,Z
 
         # --------------------------------------------------------------------------------
-        def all_points_along_wall(self, swall, get_index = False, get_normal = False):
+        def all_points_along_wall_loop(self, swall, get_index = False, get_normal = False):
             """
+            DEPRECATED
             Compute matching point R,Z for all given s in array swall along simplified wall
             return R,Z arrays
             """
