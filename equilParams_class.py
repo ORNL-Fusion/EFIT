@@ -915,15 +915,15 @@ class equilParams:
             idxin = idx[0]
             idxout = idx[1]
             
-            f = lambda s: np.float64(self.psiFunc.ev(*self.point_along_wall(s))) - 1
+            f = lambda s: np.float64(self.psiFunc.ev(*self.all_points_along_wall(s))) - 1
             swallin = bisect(f,swall[idxin],swall[idxin+1])
             swallout = bisect(f,swall[idxout],swall[idxout+1])
             
             # swap for upper single null
             if swallin > 0.5*self.Swall_max: swallin,swallout = swallout,swallin
             
-            Rin,Zin = self.point_along_wall(swallin)
-            Rout,Zout = self.point_along_wall(swallout)
+            Rin,Zin = self.all_points_along_wall(swallin)
+            Rout,Zout = self.all_points_along_wall(swallout)
             
             d = {'Rin':Rin,'Zin':Zin,'swallin':swallin,'Rout':Rout,'Zout':Zout,'swallout':swallout,'N':len(idx)}
             
@@ -933,8 +933,8 @@ class equilParams:
                 idxout2 = idx[2]
                 swallin2 = bisect(f,swall[idxin2],swall[idxin2+1])
                 swallout2 = bisect(f,swall[idxout2],swall[idxout2+1])
-                Rin2,Zin2 = self.point_along_wall(swallin2)
-                Rout2,Zout2 = self.point_along_wall(swallout2)
+                Rin2,Zin2 = self.all_points_along_wall(swallin2)
+                Rout2,Zout2 = self.all_points_along_wall(swallout2)
                 d2 = {'Rin2':Rin2,'Zin2':Zin2,'swallin2':swallin2,'Rout2':Rout2,'Zout2':Zout2,'swallout2':swallout2}
                 for key in d2.keys(): d[key] = d2[key]
             
