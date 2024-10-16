@@ -195,7 +195,11 @@ class equilParams:
         # dummy input variable for backward compatability <-> this input is unused!!!
         def getTorPsi(self, dummy=None):
             dpsi = (self.siBry - self.siAxis)/(self.nw - 1) * 2*np.pi
-            hold = integ.cumtrapz(self.PROFdict['q_prof'], dx=dpsi) * np.sign(self.data.get('bcentr'))
+            #try except to accomodate multiple versions of scipy (after 1.6 cumtrapz -> cumulative_trapezoid)
+            try:
+                hold = integ.cumtrapz(self.PROFdict['q_prof'], dx=dpsi) * np.sign(self.data.get('bcentr'))
+            except:
+                hold = integ.cumulative_trapezoid(self.PROFdict['q_prof'], dx=dpsi) * np.sign(self.data.get('bcentr'))
             psitor = np.append(0, hold)
             psitorN1D = (psitor - psitor[0])/(psitor[-1] - psitor[0])
             return {'psitorN1D': psitorN1D, 'psitor1D': psitor}
