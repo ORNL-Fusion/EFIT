@@ -15,79 +15,23 @@ import scipy.interpolate as interp
 import warnings
 
 from . import geqdsk as gdsk	# this is a relative import
+from . import IMAS_netCDF	# this is a relative import
 from . import equilibrium as eq
 
 class equilParams:
-        """
-        Open g-file, read it, and provide dictionary self.g as well as 1D and 2D interpolation functions.
-        """
-        def __init__(self, gfileNam, nw=0, nh=0, thetapnts=0, grid2G=True, tree=None,
-                     server='atlas.gat.com'):
-            # ---- get path, shot number and time from file name ----
-            # returns location of last '/' in gfileNam or -1 if not found
-            idx = gfileNam[::-1].find('/')
-            if(idx == -1):
-                gpath = '.'
-                gfile = gfileNam
+
+        def __init__(self, filename, EQmode='geqdsk', 
+                     nw=0, nh=0, thetapnts=0, grid2G=True,
+                     tree=None, server='atlas.gat.com', nc_time=0.0):
+            """
+            Open EQ file, read it, and provide dictionary self.g as well as 1D and 2D interpolation functions.
+            """
+            #read GEQDSKs text file or IMAS netcdf file
+            if EQmode=='netcdf':
+                self.readNetCDF(filename, nc_time)
             else:
-                idx *= -1
-                gpath = gfileNam[0:idx - 1]  # path without a final '/'
-                gfile = gfileNam[idx::]
-            
-            if '_' in gfile:
-                gfileA,gfileB = gfile.split('_')
-                if '.' in gfileA:
-                    idx = gfileA.find('.')
-                    shot, time = gfileA[1:idx], gfileA[idx + 1::]
-                else:
-                    shot, time = gfileA[1::], gfileB
-                fmtstr = '0' + str(len(shot)) + 'd'
-            elif '.' in gfile:
-                idx = gfile.find('.')
-                shot, time = gfile[1:idx], gfile[idx + 1::]
-                fmtstr = '0' + str(len(shot)) + 'd'
-            else:
-                shot, time, fmtstr = 0, 0, '06d'
-            try: shot = int(shot)
-            except: shot, fmtstr = 0, '06d'
-            try: time = float(time)
-            except: time = 0
+                self.readGfile(filename, tree, server, nw=0, nh=0, thetapnts=0, grid2G=True)
 
-            if (not os.path.isfile(gfileNam)) and (tree is None):
-                raise NameError('g-file not found -> Abort!')
-
-            # ---- read from MDS+, if keyword tree is given ----
-            if not (tree is None):
-                # time needs not be exact, so time could change
-                time = self._read_mds(shot, time, tree=tree, gpath=gpath, Server=server)
-                # adjust filename to match time
-                gfileNam = gpath + '/g' + format(shot, fmtstr) + '.' + format(time, '05d')
-
-            # ---- open & read g-file ----
-            self.data = gdsk.Geqdsk()
-            self.data.openFile(gfileNam)
-
-            # ---- Variables ----
-            if grid2G:
-                self.nw = self.data.get('nw')
-                self.nh = self.data.get('nh')
-                self.thetapnts = 2 * self.nh
-            else:
-                self.nw = nw
-                self.nh = nh
-                self.thetapnts = thetapnts
-            self.bcentr = self.data.get('bcentr')
-            self.rmaxis = self.data.get('rmaxis')
-            self.zmaxis = self.data.get('zmaxis')
-            self.Rmin = self.data.get('rleft')
-            self.Rmax = self.Rmin + self.data.get('rdim')
-            self.Rbdry = self.data.get('rbbbs').max()
-            self.Rsminor = np.linspace(self.rmaxis, self.Rbdry, self.nw)
-            self.Zmin = self.data.get('zmid') - self.data.get('zdim')/2.0
-            self.Zmax = self.data.get('zmid') + self.data.get('zdim')/2.0
-            self.Zlowest = self.data.get('zbbbs').min()
-            self.siAxis = self.data.get('simag')
-            self.siBry = self.data.get('sibry')
 
             # ---- default Functions ----
             self.PROFdict = self.profiles()
@@ -124,25 +68,120 @@ class equilParams:
                                                      self.B_Z.T)
 
             # ---- g dict ----
-            self.g = {'shot': shot, 'time': time, 'NR': self.nw, 'NZ': self.nh,
-                      'Xdim': self.data.get('rdim'), 'Zdim': self.data.get('zdim'),
-                      'R0': abs(self.data.get('rcentr')), 'R1': self.data.get('rleft'),
-                      'Zmid': self.data.get('zmid'), 'RmAxis': self.rmaxis, 'ZmAxis': self.zmaxis,
+            self.g = {'shot': self.shot, 'time': self.time, 'NR': self.nw, 'NZ': self.nh,
+                      'Xdim': self.rdim, 'Zdim': self.zdim,
+                      'R0': self.R0, 'R1': self.R1,
+                      'Zmid': self.Zmid, 'RmAxis': self.rmaxis, 'ZmAxis': self.zmaxis,
                       'psiAxis': self.siAxis, 'psiSep': self.siBry, 'Bt0': self.bcentr,
-                      'Ip': self.data.get('current'), 'Fpol': self.PROFdict['fpol'],
+                      'Ip': self.Ip, 'Fpol': self.PROFdict['fpol'],
                       'Pres': self.PROFdict['pres'], 'FFprime': self.PROFdict['ffprime'],
                       'Pprime': self.PROFdict['pprime'], 'qpsi': self.PROFdict['q_prof'],
                       'q': self.PROFdict['q_prof'], 'psiRZ': self.PSIdict['psi2D'],
                       'R': self.RZdict['Rs1D'], 'Z': self.RZdict['Zs1D'], 'dR': self.RZdict['dR'],
                       'dZ': self.RZdict['dZ'], 'psiRZn': self.PSIdict['psiN_2D'],
-                      'Nlcfs': self.data.get('nbbbs'), 'Nwall': self.data.get('limitr'),
-                      'lcfs': np.vstack((self.data.get('rbbbs'), self.data.get('zbbbs'))).T,
-                      'wall': np.vstack((self.data.get('rlim'), self.data.get('zlim'))).T,
+                      'Nlcfs': len(self.lcfs), 'Nwall': len(self.wall),
+                      'lcfs': self.lcfs, 'wall':self.wall, 
                       'psi': self.PSIdict['psi1D'], 'psiN': self.PSIdict['psiN1D'],'Rsminor': self.Rsminor
                       }
                       
             self.Swall, self.Swall_max = self.length_along_wall()
             self.FluxSurfList = None
+            return
+
+        def readGfile(self, gfileNam, tree=None, server='atlas.gat.com', 
+                      nw=0, nh=0, thetapnts=0, grid2G=True):
+            '''
+            reads a geqdsk file into self.data
+            '''
+            # ---- get path, shot number and time from file name ----
+            # returns location of last '/' in gfileNam or -1 if not found
+            idx = gfileNam[::-1].find('/')
+            if(idx == -1):
+                gpath = '.'
+                gfile = gfileNam
+            else:
+                idx *= -1
+                gpath = gfileNam[0:idx - 1]  # path without a final '/'
+                gfile = gfileNam[idx::]
+            
+            if '_' in gfile:
+                gfileA,gfileB = gfile.split('_')
+                if '.' in gfileA:
+                    idx = gfileA.find('.')
+                    shot, time = gfileA[1:idx], gfileA[idx + 1::]
+                else:
+                    shot, time = gfileA[1::], gfileB
+                fmtstr = '0' + str(len(shot)) + 'd'
+            elif '.' in gfile:
+                idx = gfile.find('.')
+                shot, time = gfile[1:idx], gfile[idx + 1::]
+                fmtstr = '0' + str(len(shot)) + 'd'
+            else:
+                shot, time, fmtstr = 0, 0, '06d'
+            try: shot = int(shot)
+            except: shot, fmtstr = 0, '06d'
+            try: time = float(time)
+            except: time = 0
+
+            self.shot = shot
+            self.time = time
+
+            if (not os.path.isfile(gfileNam)) and (tree is None):
+                raise NameError('g-file not found -> Abort!')
+
+            # ---- read from MDS+, if keyword tree is given ----
+            if not (tree is None):
+                # time needs not be exact, so time could change
+                time = self._read_mds(shot, time, tree=tree, gpath=gpath, Server=server)
+                # adjust filename to match time
+                gfileNam = gpath + '/g' + format(shot, fmtstr) + '.' + format(time, '05d')
+
+            # ---- open & read g-file ----
+            self.data = gdsk.Geqdsk()
+            self.data.openFile(gfileNam)
+
+            # ---- Variables ----
+            if grid2G:
+                self.nw = self.data.get('nw')
+                self.nh = self.data.get('nh')
+                self.thetapnts = 2 * self.nh
+            else:
+                self.nw = nw
+                self.nh = nh
+                self.thetapnts = thetapnts
+            self.bcentr = self.data.get('bcentr')
+            self.rmaxis = self.data.get('rmaxis')
+            self.zmaxis = self.data.get('zmaxis')
+            self.Rmin = self.data.get('rleft')
+            self.Rmax = self.Rmin + self.data.get('rdim')
+            self.Rbdry = self.data.get('rbbbs').max()
+            self.Rsminor = np.linspace(self.rmaxis, self.Rbdry, self.nw)
+            self.Zmin = self.data.get('zmid') - self.data.get('zdim')/2.0
+            self.Zmax = self.data.get('zmid') + self.data.get('zdim')/2.0
+            self.Zlowest = self.data.get('zbbbs').min()
+            self.siAxis = self.data.get('simag')
+            self.siBry = self.data.get('sibry')
+            self.lcfs = np.vstack((self.data.get('rbbbs'), self.data.get('zbbbs'))).T
+            self.wall = np.vstack((self.data.get('rlim'), self.data.get('zlim'))).T
+            self.rdim = self.data.get('rdim')
+            self.zdim = self.data.get('zdim')
+            self.R0 = abs(self.data.get('rcentr'))
+            self.R1 = self.data.get('rleft')
+            self.Zmid = self.data.get('zmid')
+            self.Ip = self.data.get('current')
+
+
+            return
+
+
+        def readNetCDF(self, filename, nc_time):
+            """
+            reads an IMAS formatted equilibrium netcdf
+            """
+            imas_nc = IMAS_netCDF.netCDF()
+            self.data = imas_nc.readNetCDF(filename, nc_time)
+
+            return
 
         # --------------------------------------------------------------------------------
         # Interpolation function handles for all 1-D fields in the g-file
@@ -841,8 +880,8 @@ class equilParams:
             p1 = np.array([Rwall[idx], Zwall[idx]])
             p2, i = p1, 1
             while np.all(p2 == p1):		# if points are identical
-            	p2 = np.array([Rwall[idx-i], Zwall[idx-i]]) # works for idx == 0 as well
-            	i += 1
+                p2 = np.array([Rwall[idx-i], Zwall[idx-i]]) # works for idx == 0 as well
+                i += 1
 
             # linear interplation between bracket points
             d = p2 - p1
