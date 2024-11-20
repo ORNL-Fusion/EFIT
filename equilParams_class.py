@@ -96,6 +96,7 @@ class equilParams:
             self.PHIdict = self.getTorPsi()
 
             # ---- more Variables ----
+            # 2D arrays are shaped (NZ,NR) - verified!
             self.dpsidZ, self.dpsidR = np.gradient(self.PSIdict['psi2D'], self.RZdict['dZ'],
                                                    self.RZdict['dR'])
             self.B_R = self.dpsidZ / self.RZdict['Rs2D']
@@ -969,6 +970,31 @@ class equilParams:
             Bp_div = self.BpFunc.ev(Rdiv,Zdiv)
             
             return (Rmid*Bp_mid) / (Rdiv*Bp_div)
+            
+        
+         # --------------------------------------------------------------------------------
+        def helicity(self):
+            """
+            Calculate helicity from psiRZ and Fpol
+            verify with Bt and Ip signs
+            """
+            # get a point at outboard midplane, near the separatrix
+            nR,nZ = abs(self.g['R'] - self.g['lcfs'][:,0].max()).argmin(), int(self.g['NZ']/2)
+            
+            # helicity = -sign(Bz/Bphi) at outboard midplane
+            # Bz = -dpsidR / R;		Bphi = Fpol / R;	Fpol ~ Bt0 * R0;	Bz ~ Ip / (R-R0)
+            isHelicity = np.sign(self.dpsidR[nZ,nR]/self.g['Fpol'][-1])
+            expectHelicity = np.sign(self.g['Ip']/self.g['Bt0'])
+            
+            if not (expectHelicity == isHelicity):
+            	print('Helicity is inconsistent in g-File')
+            	if not (np.sign(self.g['Bt0']) == np.sign(self.g['Fpol'][-1])):
+            		print('Flip sign of Bt in g-file')
+            	else:
+            		print('Flip sign of Ip in g-file')
+            
+            return isHelicity
+        
 
         # --------------------------------------------------------------------------------
         # --------------------------------------------------------------------------------
