@@ -5,8 +5,8 @@ First Implemented: Sep. 10. 2012
 Please report bugs to: wingen@fusion.gat.com
 Python 3 version
 """
-_VERSION = 5.01
-_LAST_UPDATE = 'May 15. 2023'
+_VERSION = 5.1
+_LAST_UPDATE = 'Nov 22. 2024'
 
 import os
 import numpy as np
@@ -747,6 +747,7 @@ class equilParams:
             print('   .psiFunc.ev(R,Z),  .BRFunc.ev(R,Z),  .BZFunc.ev(R,Z),  .BpFunc.ev(R,Z),  .BtFunc.ev(R,Z)')
             print('Further available functions include: strike line locations, flux expansion, Swall cooridante transformations,')
             print('   curvature and shear, 2D current density, and more...')
+            print('Current code version is: ', _VERSION)
             
 
         # --------------------------------------------------------------------------------
