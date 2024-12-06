@@ -15,7 +15,7 @@ import scipy.interpolate as interp
 import warnings
 
 from . import geqdsk as gdsk	# this is a relative import
-from . import IMAS_netCDF	# this is a relative import
+from . import IMAS_EQ	# this is a relative import
 from . import equilibrium as eq
 
 class equilParams:
@@ -25,6 +25,9 @@ class equilParams:
                      tree=None, server='atlas.gat.com', nc_time=0.0):
             """
             Open EQ file, read it, and provide dictionary self.g as well as 1D and 2D interpolation functions.
+
+            if EQmode == 'netcdf', uses a netCDF reader, 
+            else uses GEQDSK reader
             """
             #read GEQDSKs text file or IMAS netcdf file
             if EQmode=='netcdf':
@@ -165,7 +168,16 @@ class equilParams:
             self.wall = np.vstack((self.data.get('rlim'), self.data.get('zlim'))).T
             self.rdim = self.data.get('rdim')
             self.zdim = self.data.get('zdim')
-            self.R0 = abs(self.data.get('rcentr'))
+            self.R0 = abs(self.data.get('rc        def readHDF5(self, filename, nc_time):
+            """
+            reads an IMAS formatted equilibrium hdf5
+            """
+            imas_hdf5 = IMAS_EQ.HDF5()
+            self.data = imas_hdf5.readHDF5(filename, nc_time)
+
+            return
+
+ntr'))
             self.R1 = self.data.get('rleft')
             self.Zmid = self.data.get('zmid')
             self.Ip = self.data.get('current')
@@ -178,10 +190,11 @@ class equilParams:
             """
             reads an IMAS formatted equilibrium netcdf
             """
-            imas_nc = IMAS_netCDF.netCDF()
+            imas_nc = IMAS_EQ.netCDF()
             self.data = imas_nc.readNetCDF(filename, nc_time)
 
             return
+
 
         # --------------------------------------------------------------------------------
         # Interpolation function handles for all 1-D fields in the g-file
