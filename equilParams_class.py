@@ -22,18 +22,34 @@ class equilParams:
 
         def __init__(self, filename, EQmode='geqdsk', 
                      nw=0, nh=0, thetapnts=0, grid2G=True,
-                     tree=None, server='atlas.gat.com', nc_time=0.0):
+                     tree=None, server='atlas.gat.com', time=10.4):
             """
             Open EQ file, read it, and provide dictionary self.g as well as 1D and 2D interpolation functions.
 
             if EQmode == 'netcdf', uses a netCDF reader, 
+            if EQmode == 'json', uses a json reader, 
             else uses GEQDSK reader
             """
-            #read GEQDSKs text file or IMAS netcdf file
+
+            #read GEQDSKs text file or IMAS formatted file (netCDF, HDF5, JSON)
+            GEQDSKflag = False
             if EQmode=='netcdf':
-                self.readNetCDF(filename, nc_time)
+                print("NetCDF EQmode")
+                imas_nc = IMAS_EQ.netCDF_IMAS()
+                self.data = imas_nc.readNetCDF(filename, time)
+            elif EQmode=='json':
+                print("JSON EQmode")
+                imas_js = IMAS_EQ.JSON_IMAS()
+                self.data = imas_js.readJSON(filename, time)
             else:
+                print("GEQDSK EQmode")
+                GEQDSKflag = True
                 self.readGfile(filename, tree, server, nw=0, nh=0, thetapnts=0, grid2G=True)
+
+            if GEQDSKflag == False:
+                self.shot = 1 #arbitrary for now
+                for key, value in self.data.items():
+                    setattr(self, key, value)
 
 
             # ---- default Functions ----
@@ -71,7 +87,7 @@ class equilParams:
                                                      self.B_Z.T)
 
             # ---- g dict ----
-            self.g = {'shot': self.shot, 'time': self.time, 'NR': self.nw, 'NZ': self.nh,
+            self.g = {'shot': self.shot, 'time': time, 'NR': self.nw, 'NZ': self.nh,
                       'Xdim': self.rdim, 'Zdim': self.zdim,
                       'R0': self.R0, 'R1': self.R1,
                       'Zmid': self.Zmid, 'RmAxis': self.rmaxis, 'ZmAxis': self.zmaxis,
@@ -86,6 +102,7 @@ class equilParams:
                       'lcfs': self.lcfs, 'wall':self.wall, 
                       'psi': self.PSIdict['psi1D'], 'psiN': self.PSIdict['psiN1D'],'Rsminor': self.Rsminor
                       }
+            
                       
             self.Swall, self.Swall_max = self.length_along_wall()
             self.FluxSurfList = None
@@ -164,24 +181,15 @@ class equilParams:
             self.Zlowest = self.data.get('zbbbs').min()
             self.siAxis = self.data.get('simag')
             self.siBry = self.data.get('sibry')
+            
             self.lcfs = np.vstack((self.data.get('rbbbs'), self.data.get('zbbbs'))).T
             self.wall = np.vstack((self.data.get('rlim'), self.data.get('zlim'))).T
             self.rdim = self.data.get('rdim')
             self.zdim = self.data.get('zdim')
-            self.R0 = abs(self.data.get('rc        def readHDF5(self, filename, nc_time):
-            """
-            reads an IMAS formatted equilibrium hdf5
-            """
-            imas_hdf5 = IMAS_EQ.HDF5()
-            self.data = imas_hdf5.readHDF5(filename, nc_time)
-
-            return
-
-ntr'))
+            self.R0 = abs(self.data.get('rcentr'))
             self.R1 = self.data.get('rleft')
             self.Zmid = self.data.get('zmid')
             self.Ip = self.data.get('current')
-
 
             return
 
