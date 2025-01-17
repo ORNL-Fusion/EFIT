@@ -22,13 +22,28 @@ class equilParams:
 
         def __init__(self, filename, EQmode='geqdsk', 
                      nw=0, nh=0, thetapnts=0, grid2G=True,
-                     tree=None, server='atlas.gat.com', time=10.4):
+                     tree=None, server='atlas.gat.com', time=10.4,
+                     psiMult=1.0, BtMult=1.0, IpMult=1.0):
             """
             Open EQ file, read it, and provide dictionary self.g as well as 1D and 2D interpolation functions.
 
             if EQmode == 'netcdf', uses a netCDF reader, 
             if EQmode == 'json', uses a json reader, 
             else uses GEQDSK reader
+
+            filename is name of EQ file (GEQDSK, JSON, HDF5, NETCDF)
+            EQmode is string that identifies file type
+            nw is grid radial dimension
+            nh is grid vertical dimension
+            thetapnts is number of points in poloidal angle
+            grid2G is 
+            tree is string of tree if using MDS+
+            server is MDS+ server
+            time is timestep of this equilibrium
+            psiMult is multiplier for psi quantities (ie psiRZ, psiSep, psiAxis)
+            BtMult is multiplier for Bt quantities (Bt, Fpol)
+            IpMult is multipler for Ip 
+
             """
 
             #read GEQDSKs text file or IMAS formatted file (netCDF, HDF5, JSON)
@@ -51,12 +66,18 @@ class equilParams:
                 for key, value in self.data.items():
                     setattr(self, key, value)
 
+            # ---- normalize variables per arguments ----
+            self.siAxis *= psiMult
+            self.siBry *= psiMult
+            self.bcentr *= BtMult
+            self.Ip *= IpMult
 
             # ---- default Functions ----
-            self.PROFdict = self.profiles()
+            self.PROFdict = self.profiles(BtMult)
             self.RZdict = self.RZ_params()
-            self.PSIdict = self.getPsi()
+            self.PSIdict = self.getPsi(psiMult)
             self.PHIdict = self.getTorPsi()
+
 
             # ---- more Variables ----
             self.dpsidZ, self.dpsidR = np.gradient(self.PSIdict['psi2D'], self.RZdict['dZ'],
@@ -206,7 +227,7 @@ class equilParams:
 
         # --------------------------------------------------------------------------------
         # Interpolation function handles for all 1-D fields in the g-file
-        def profiles(self):
+        def profiles(self, BtMult):
             # ---- Profiles ----
             fpol = self.data.get('fpol')
             ffunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(fpol)), fpol, s=0)
@@ -241,10 +262,10 @@ class equilParams:
         # (psipol = 2pi integral_Raxis^Rsurf(Bpol * R * dR))
         # regular is shifted by self.siAxis and missing the factor 2*pi !!!
         # so: psipol = psi1D = 2pi * (self.siBry-self.siAxis) * psiN1D
-        def getPsi(self):
+        def getPsi(self, psiMult):
             psiN1D = np.linspace(0.0, 1.0, self.nw)
             psi1D = 2 * np.pi * (self.siBry - self.siAxis) * psiN1D
-            psi2D = self.data.get('psirz')
+            psi2D = self.data.get('psirz') * psiMult
             psiN_2D = (psi2D - self.siAxis) / (self.siBry - self.siAxis)
             # psiN_2D[np.where(psiN_2D > 1.2)] = 1.2
             return {'psi2D': psi2D, 'psiN_2D': psiN_2D, 'psi1D': psi1D, 'psiN1D': psiN1D}
