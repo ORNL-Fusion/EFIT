@@ -15,14 +15,130 @@ import scipy.interpolate as interp
 import warnings
 
 from . import geqdsk as gdsk	# this is a relative import
+from . import IMAS_EQ	# this is a relative import
 from . import equilibrium as eq
 
 class equilParams:
-        """
-        Open g-file, read it, and provide dictionary self.g as well as 1D and 2D interpolation functions.
-        """
-        def __init__(self, gfileNam, nw=0, nh=0, thetapnts=0, grid2G=True, tree=None,
-                     server='atlas.gat.com'):
+
+        def __init__(self, filename, EQmode='geqdsk', 
+                     nw=0, nh=0, thetapnts=0, grid2G=True,
+                     tree=None, server='atlas.gat.com', time=10.4,
+                     psiMult=1.0, BtMult=1.0, IpMult=1.0):
+            """
+            Open EQ file, read it, and provide dictionary self.g as well as 1D and 2D interpolation functions.
+
+            if EQmode == 'netcdf', uses a netCDF reader, 
+            if EQmode == 'json', uses a json reader, 
+            else uses GEQDSK reader
+
+            filename is name of EQ file (GEQDSK, JSON, HDF5, NETCDF)
+            EQmode is string that identifies file type
+            nw is grid radial dimension
+            nh is grid vertical dimension
+            thetapnts is number of points in poloidal angle
+            grid2G is 
+            tree is string of tree if using MDS+
+            server is MDS+ server
+            time is timestep of this equilibrium
+            psiMult is multiplier for psi quantities (ie psiRZ, psiSep, psiAxis)
+            BtMult is multiplier for Bt quantities (Bt, Fpol)
+            IpMult is multipler for Ip 
+
+            """
+
+            #read GEQDSKs text file or IMAS formatted file (netCDF, HDF5, JSON)
+            GEQDSKflag = False
+            if EQmode=='netcdf':
+                print("NetCDF EQmode")
+                imas_nc = IMAS_EQ.netCDF_IMAS()
+                self.data = imas_nc.readNetCDF(filename, time)
+            elif EQmode=='json':
+                print("JSON EQmode")
+                imas_js = IMAS_EQ.JSON_IMAS()
+                self.data = imas_js.readJSON(filename, time)
+            else:
+                print("GEQDSK EQmode")
+                GEQDSKflag = True
+                self.readGfile(filename, tree, server, nw=0, nh=0, thetapnts=0, grid2G=True)
+
+            if GEQDSKflag == False:
+                self.shot = 1 #arbitrary for now
+                for key, value in self.data.items():
+                    setattr(self, key, value)
+
+            # ---- normalize variables per arguments ----
+            self.siAxis *= psiMult
+            self.siBry *= psiMult
+            self.bcentr *= BtMult
+            self.Ip *= IpMult
+
+            # ---- default Functions ----
+            self.PROFdict = self.profiles(BtMult)
+            self.RZdict = self.RZ_params()
+            self.PSIdict = self.getPsi(psiMult)
+            self.PHIdict = self.getTorPsi()
+
+
+            # ---- more Variables ----
+            self.dpsidZ, self.dpsidR = np.gradient(self.PSIdict['psi2D'], self.RZdict['dZ'],
+                                                   self.RZdict['dR'])
+            self.B_R = self.dpsidZ / self.RZdict['Rs2D']
+            self.B_Z = -self.dpsidR / self.RZdict['Rs2D']
+            self.Bp_2D = np.sqrt(self.B_R**2 + self.B_Z**2)
+            self.theta = np.linspace(0.0, 2.*np.pi, self.thetapnts)
+
+            psiN2D = self.PSIdict['psiN_2D'].flatten()
+            idx = np.where(psiN2D <= 1)[0]
+            Fpol_sep = self.PROFdict['ffunc'](1.0)   #self.data.get('bcentr') * abs(self.data.get('rcentr'))
+            Fpol2D = np.ones(psiN2D.shape) * Fpol_sep
+            Fpol2D[idx] = self.PROFdict['ffunc'](psiN2D[idx])
+            Fpol2D = Fpol2D.reshape(self.PSIdict['psiN_2D'].shape)
+            self.Bt_2D = Fpol2D / self.RZdict['Rs2D']
+
+            # ---- more Functions ----
+            self.psiFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'],
+                                                      self.PSIdict['psiN_2D'].T)
+            self.BpFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'],
+                                                     self.Bp_2D.T)
+            self.BtFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'],
+                                                     self.Bt_2D.T)
+            self.BRFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'],
+                                                     self.B_R.T)
+            self.BZFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'],
+                                                     self.B_Z.T)
+
+            shape = self.get_FluxShape(1.0)	# {'kappa', 'tri_avg', 'triUP', 'triLO', 'aminor', 'aspect', 'radius'}
+
+            # ---- g dict ----
+            self.g = {'shot': shot, 'time': time, 'NR': self.nw, 'NZ': self.nh,
+                      'Xdim': self.data.get('rdim'), 'Zdim': self.data.get('zdim'),
+                      'R0': abs(self.data.get('rcentr')), 'R1': self.data.get('rleft'),
+                      'Zmid': self.data.get('zmid'), 'RmAxis': self.rmaxis, 'ZmAxis': self.zmaxis,
+                      'psiAxis': self.siAxis, 'psiSep': self.siBry, 'Bt0': self.bcentr,
+                      'Ip': self.data.get('current'), 'Fpol': self.PROFdict['fpol'],
+                      'Pres': self.PROFdict['pres'], 'FFprime': self.PROFdict['ffprime'],
+                      'Pprime': self.PROFdict['pprime'], 'qpsi': self.PROFdict['q_prof'],
+                      'q': self.PROFdict['q_prof'], 'psiRZ': self.PSIdict['psi2D'],
+                      'R': self.RZdict['Rs1D'], 'Z': self.RZdict['Zs1D'], 'dR': self.RZdict['dR'],
+                      'dZ': self.RZdict['dZ'], 'psiRZn': self.PSIdict['psiN_2D'],
+                      'Nlcfs': self.data.get('nbbbs'), 'Nwall': self.data.get('limitr'),
+                      'lcfs': np.vstack((self.data.get('rbbbs'), self.data.get('zbbbs'))).T,
+                      'wall': np.vstack((self.data.get('rlim'), self.data.get('zlim'))).T,
+                      'psi': self.PSIdict['psi1D'], 'psiN': self.PSIdict['psiN1D'],'Rsminor': self.Rsminor,
+                      'kappa': shape['kappa'], 'triUP': shape['triUP'][0], 'triLO': shape['triLO'][0], 
+                      'aminor': shape['aminor'], 'aspect': shape['aspect']}
+                      
+            self.Swall, self.Swall_max = self.length_along_wall()
+            self.isHelicity = self.helicity()
+            self.g['helicity'] = self.isHelicity
+            self.FluxSurfList = None
+            return
+
+        def readGfile(self, gfileNam, tree=None, server='atlas.gat.com', 
+                      nw=0, nh=0, thetapnts=0, grid2G=True):
+            '''
+            reads a geqdsk file into self.data
+            '''
             # ---- get path, shot number and time from file name ----
             # returns location of last '/' in gfileNam or -1 if not found
             idx = gfileNam[::-1].find('/')
@@ -52,6 +168,9 @@ class equilParams:
             except: shot, fmtstr = 0, '06d'
             try: time = float(time)
             except: time = 0
+
+            self.shot = shot
+            self.time = time
 
             if (not os.path.isfile(gfileNam)) and (tree is None):
                 raise NameError('g-file not found -> Abort!')
@@ -88,71 +207,30 @@ class equilParams:
             self.Zlowest = self.data.get('zbbbs').min()
             self.siAxis = self.data.get('simag')
             self.siBry = self.data.get('sibry')
+            
+            self.lcfs = np.vstack((self.data.get('rbbbs'), self.data.get('zbbbs'))).T
+            self.wall = np.vstack((self.data.get('rlim'), self.data.get('zlim'))).T
+            self.rdim = self.data.get('rdim')
+            self.zdim = self.data.get('zdim')
+            self.R0 = abs(self.data.get('rcentr'))
+            self.R1 = self.data.get('rleft')
+            self.Zmid = self.data.get('zmid')
+            self.Ip = self.data.get('current')
 
-            # ---- default Functions ----
-            self.PROFdict = self.profiles()
-            self.RZdict = self.RZ_params()
-            self.PSIdict = self.getPsi()
-            self.PHIdict = self.getTorPsi()
+            return
 
-            # ---- more Variables ----
-            # 2D arrays are shaped (NZ,NR) - verified!
-            self.dpsidZ, self.dpsidR = np.gradient(self.PSIdict['psi2D'], self.RZdict['dZ'],
-                                                   self.RZdict['dR'])
-            self.B_R = self.dpsidZ / self.RZdict['Rs2D']
-            self.B_Z = -self.dpsidR / self.RZdict['Rs2D']
-            self.Bp_2D = np.sqrt(self.B_R**2 + self.B_Z**2)
-            self.theta = np.linspace(0.0, 2.*np.pi, self.thetapnts)
+        def readNetCDF(self, filename, nc_time):
+            """
+            reads an IMAS formatted equilibrium netcdf
+            """
+            imas_nc = IMAS_EQ.netCDF()
+            self.data = imas_nc.readNetCDF(filename, nc_time)
 
-            psiN2D = self.PSIdict['psiN_2D'].flatten()
-            idx = np.where(psiN2D <= 1)[0]
-            Fpol_sep = self.PROFdict['ffunc'](1.0)   #self.data.get('bcentr') * abs(self.data.get('rcentr'))
-            Fpol2D = np.ones(psiN2D.shape) * Fpol_sep
-            Fpol2D[idx] = self.PROFdict['ffunc'](psiN2D[idx])
-            Fpol2D = Fpol2D.reshape(self.PSIdict['psiN_2D'].shape)
-            self.Bt_2D = Fpol2D / self.RZdict['Rs2D']
-
-            # ---- more Functions ----
-            self.psiFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'],
-                                                      self.PSIdict['psiN_2D'].T)
-            self.BpFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'],
-                                                     self.Bp_2D.T)
-            self.BtFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'],
-                                                     self.Bt_2D.T)
-            self.BRFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'],
-                                                     self.B_R.T)
-            self.BZFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'],
-                                                     self.B_Z.T)
-                                                     
-            shape = self.get_FluxShape(1.0)	# {'kappa', 'tri_avg', 'triUP', 'triLO', 'aminor', 'aspect', 'radius'}
-
-            # ---- g dict ----
-            self.g = {'shot': shot, 'time': time, 'NR': self.nw, 'NZ': self.nh,
-                      'Xdim': self.data.get('rdim'), 'Zdim': self.data.get('zdim'),
-                      'R0': abs(self.data.get('rcentr')), 'R1': self.data.get('rleft'),
-                      'Zmid': self.data.get('zmid'), 'RmAxis': self.rmaxis, 'ZmAxis': self.zmaxis,
-                      'psiAxis': self.siAxis, 'psiSep': self.siBry, 'Bt0': self.bcentr,
-                      'Ip': self.data.get('current'), 'Fpol': self.PROFdict['fpol'],
-                      'Pres': self.PROFdict['pres'], 'FFprime': self.PROFdict['ffprime'],
-                      'Pprime': self.PROFdict['pprime'], 'qpsi': self.PROFdict['q_prof'],
-                      'q': self.PROFdict['q_prof'], 'psiRZ': self.PSIdict['psi2D'],
-                      'R': self.RZdict['Rs1D'], 'Z': self.RZdict['Zs1D'], 'dR': self.RZdict['dR'],
-                      'dZ': self.RZdict['dZ'], 'psiRZn': self.PSIdict['psiN_2D'],
-                      'Nlcfs': self.data.get('nbbbs'), 'Nwall': self.data.get('limitr'),
-                      'lcfs': np.vstack((self.data.get('rbbbs'), self.data.get('zbbbs'))).T,
-                      'wall': np.vstack((self.data.get('rlim'), self.data.get('zlim'))).T,
-                      'psi': self.PSIdict['psi1D'], 'psiN': self.PSIdict['psiN1D'],'Rsminor': self.Rsminor,
-                      'kappa': shape['kappa'], 'triUP': shape['triUP'][0], 'triLO': shape['triLO'][0], 
-                      'aminor': shape['aminor'], 'aspect': shape['aspect']}
-                      
-            self.Swall, self.Swall_max = self.length_along_wall()
-            self.isHelicity = self.helicity()
-            self.g['helicity'] = self.isHelicity
-            self.FluxSurfList = None
-
+            return
+          
         # --------------------------------------------------------------------------------
         # Interpolation function handles for all 1-D fields in the g-file
-        def profiles(self):
+        def profiles(self, BtMult):
             # ---- Profiles ----
             fpol = self.data.get('fpol')
             ffunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(fpol)), fpol, s=0)
@@ -187,10 +265,10 @@ class equilParams:
         # (psipol = 2pi integral_Raxis^Rsurf(Bpol * R * dR))
         # regular is shifted by self.siAxis and missing the factor 2*pi !!!
         # so: psipol = psi1D = 2pi * (self.siBry-self.siAxis) * psiN1D
-        def getPsi(self):
+        def getPsi(self, psiMult):
             psiN1D = np.linspace(0.0, 1.0, self.nw)
             psi1D = 2 * np.pi * (self.siBry - self.siAxis) * psiN1D
-            psi2D = self.data.get('psirz')
+            psi2D = self.data.get('psirz') * psiMult
             psiN_2D = (psi2D - self.siAxis) / (self.siBry - self.siAxis)
             # psiN_2D[np.where(psiN_2D > 1.2)] = 1.2
             return {'psi2D': psi2D, 'psiN_2D': psiN_2D, 'psi1D': psi1D, 'psiN1D': psiN1D}
@@ -201,7 +279,11 @@ class equilParams:
         # dummy input variable for backward compatability <-> this input is unused!!!
         def getTorPsi(self, dummy=None):
             dpsi = (self.siBry - self.siAxis)/(self.nw - 1) * 2*np.pi
-            hold = integ.cumtrapz(self.PROFdict['q_prof'], dx=dpsi) * np.sign(self.data.get('bcentr'))
+            #try except to accomodate multiple versions of scipy (after 1.6 cumtrapz -> cumulative_trapezoid)
+            try:
+                hold = integ.cumtrapz(self.PROFdict['q_prof'], dx=dpsi) * np.sign(self.data.get('bcentr'))
+            except:
+                hold = integ.cumulative_trapezoid(self.PROFdict['q_prof'], dx=dpsi) * np.sign(self.data.get('bcentr'))
             psitor = np.append(0, hold)
             psitorN1D = (psitor - psitor[0])/(psitor[-1] - psitor[0])
             return {'psitorN1D': psitorN1D, 'psitor1D': psitor}
@@ -1004,8 +1086,8 @@ class equilParams:
             p1 = np.array([Rwall[idx], Zwall[idx]])
             p2, i = p1, 1
             while np.all(p2 == p1):		# if points are identical
-            	p2 = np.array([Rwall[idx-i], Zwall[idx-i]]) # works for idx == 0 as well
-            	i += 1
+                p2 = np.array([Rwall[idx-i], Zwall[idx-i]]) # works for idx == 0 as well
+                i += 1
 
             # linear interplation between bracket points
             d = p2 - p1
