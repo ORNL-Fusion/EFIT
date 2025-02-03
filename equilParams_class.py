@@ -57,7 +57,7 @@ class equilParams:
                 imas_js = IMAS_EQ.JSON_IMAS()
                 self.data = imas_js.readJSON(filename, time)
             else:
-                print("GEQDSK EQmode")
+                #print("GEQDSK EQmode")
                 GEQDSKflag = True
                 self.readGfile(filename, tree, server, nw=0, nh=0, thetapnts=0, grid2G=True)
 
