@@ -110,7 +110,7 @@ class equilParams:
             shape = self.get_FluxShape(1.0)	# {'kappa', 'tri_avg', 'triUP', 'triLO', 'aminor', 'aspect', 'radius'}
 
             # ---- g dict ----
-            self.g = {'shot': shot, 'time': time, 'NR': self.nw, 'NZ': self.nh,
+            self.g = {'shot': self.shot, 'time': self.time, 'NR': self.nw, 'NZ': self.nh,
                       'Xdim': self.data.get('rdim'), 'Zdim': self.data.get('zdim'),
                       'R0': abs(self.data.get('rcentr')), 'R1': self.data.get('rleft'),
                       'Zmid': self.data.get('zmid'), 'RmAxis': self.rmaxis, 'ZmAxis': self.zmaxis,
