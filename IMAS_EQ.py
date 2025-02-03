@@ -19,7 +19,8 @@ class netCDF_IMAS:
         """
         reads from IMAS netCDF and assigns to the parameters we use in the equilParams_class ep object
 
-        THIS FUNCTION IS BROKEN AND NEEDS TO BE UPDATED WITH LATEST IMAS SCHEMA
+        THIS FUNCTION IS NOT YET IMPLEMENTED
+        NEEDS TO BE UPDATED WITH LATEST IMAS SCHEMA
                 
         """
         import netCDF4
@@ -118,3 +119,67 @@ class JSON_IMAS:
         d['thetapnts'] = 2*d['nw']
         d['Rsminor'] = np.linspace(d['rmaxis'], d['Rbdry'], d['nw'])
         return d
+    
+    def writeGEQDSK(self, file, g, shot=None, time=None, ep=None):
+        """
+        writes a new gfile.  user must supply
+        file: name of new gfile
+        g:    dictionary containing all GEQDSK parameters
+        shot: new shot number
+        time: new shot timestep [ms]
+
+        Note that this writes some data as 0 (ie rhovn, kvtor, etc.)
+        """
+
+        if shot==None:
+            shot=1
+        if time==None:
+            time=1
+
+        KVTOR = 0
+        RVTOR = 1.7
+        NMASS = 0
+        RHOVN = np.zeros((g['NR']))
+
+        print('Writing to path: ' +file)
+        with open(file, 'w') as f:
+            f.write('  EFIT    xx/xx/xxxx    #' + str(shot) + '  ' + str(time) + 'ms        ')
+            f.write('   3 ' + str(g['NR']) + ' ' + str(g['NZ']) + '\n')
+            f.write('% .9E% .9E% .9E% .9E% .9E\n'%(g['Xdim'], g['Zdim'], g['R0'], g['R1'], g['Zmid']))
+            f.write('% .9E% .9E% .9E% .9E% .9E\n'%(g['RmAxis'], g['ZmAxis'], g['psiAxis'], g['psiSep'], g['Bt0']))
+            f.write('% .9E% .9E% .9E% .9E% .9E\n'%(g['Ip'], 0, 0, 0, 0))
+            f.write('% .9E% .9E% .9E% .9E% .9E\n'%(0,0,0,0,0))
+            self._write_array(g['Fpol'], f)
+            self._write_array(g['Pres'], f)
+            self._write_array(g['FFprime'], f)
+            self._write_array(g['Pprime'], f)
+            self._write_array(g['psiRZ'].flatten(), f)
+            self._write_array(g['qpsi'], f)
+            f.write(str(g['Nlcfs']) + ' ' + str(g['Nwall']) + '\n')
+            self._write_array(g['lcfs'].flatten(), f)
+            self._write_array(g['wall'].flatten(), f)
+            f.write(str(KVTOR) + ' ' + format(RVTOR, ' .9E') + ' ' + str(NMASS) + '\n')
+            self._write_array(RHOVN, f)
+
+        print('Wrote new gfile')
+
+
+
+    #=====================================================================
+    #                       private functions
+    #=====================================================================
+    # --- _write_array -----------------------
+    # write numpy array in format used in g-file:
+    # 5 columns, 9 digit float with exponents and no spaces in front of negative numbers
+    def _write_array(self, x, f):
+        N = len(x)
+        rows = int(N/5)  # integer division
+        rest = N - 5*rows
+        for i in range(rows):
+            for j in range(5):
+                    f.write('% .9E' % (x[i*5 + j]))
+            f.write('\n')
+        if(rest > 0):
+            for j in range(rest):
+                f.write('% .9E' % (x[rows*5 + j]))
+            f.write('\n')
