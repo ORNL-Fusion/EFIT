@@ -5,8 +5,8 @@ First Implemented: Sep. 10. 2012
 Please report bugs to: wingen@fusion.gat.com
 Python 3 version
 """
-_VERSION = 5.1
-_LAST_UPDATE = 'Nov 22. 2024'
+_VERSION = 5.2
+_LAST_UPDATE = 'Feb 03. 2025'
 
 import os
 import numpy as np
@@ -134,6 +134,7 @@ class equilParams:
             self.FluxSurfList = None
             return
 
+        # --------------------------------------------------------------------------------
         def readGfile(self, gfileNam, tree=None, server='atlas.gat.com', 
                       nw=0, nh=0, thetapnts=0, grid2G=True):
             '''
@@ -219,6 +220,7 @@ class equilParams:
 
             return
 
+        # --------------------------------------------------------------------------------
         def readNetCDF(self, filename, nc_time):
             """
             reads an IMAS formatted equilibrium netcdf
