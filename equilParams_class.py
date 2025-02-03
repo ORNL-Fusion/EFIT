@@ -48,11 +48,12 @@ class equilParams:
 
             #read GEQDSKs text file or IMAS formatted file (netCDF, HDF5, JSON)
             GEQDSKflag = False
-            if EQmode=='netcdf':
+            if ('.json' in filename[-5::]) or ('.JSON' in filename[-5::]): EQmode = 'json'
+            if EQmode == 'netcdf':
                 print("NetCDF EQmode")
                 imas_nc = IMAS_EQ.netCDF_IMAS()
                 self.data = imas_nc.readNetCDF(filename, time)
-            elif EQmode=='json':
+            elif EQmode == 'json':
                 print("JSON EQmode")
                 imas_js = IMAS_EQ.JSON_IMAS()
                 self.data = imas_js.readJSON(filename, time)
@@ -63,6 +64,7 @@ class equilParams:
 
             if GEQDSKflag == False:
                 self.shot = 1 #arbitrary for now
+                self.time = time 
                 for key, value in self.data.items():
                     setattr(self, key, value)
 
@@ -78,7 +80,6 @@ class equilParams:
             self.PSIdict = self.getPsi(psiMult)
             self.PHIdict = self.getTorPsi()
 
-
             # ---- more Variables ----
             self.dpsidZ, self.dpsidR = np.gradient(self.PSIdict['psi2D'], self.RZdict['dZ'],
                                                    self.RZdict['dR'])
@@ -89,7 +90,7 @@ class equilParams:
 
             psiN2D = self.PSIdict['psiN_2D'].flatten()
             idx = np.where(psiN2D <= 1)[0]
-            Fpol_sep = self.PROFdict['ffunc'](1.0)   #self.data.get('bcentr') * abs(self.data.get('rcentr'))
+            Fpol_sep = self.PROFdict['ffunc'](1.0)   #self.bcentr * abs(self.R0)
             Fpol2D = np.ones(psiN2D.shape) * Fpol_sep
             Fpol2D[idx] = self.PROFdict['ffunc'](psiN2D[idx])
             Fpol2D = Fpol2D.reshape(self.PSIdict['psiN_2D'].shape)
@@ -111,19 +112,18 @@ class equilParams:
 
             # ---- g dict ----
             self.g = {'shot': self.shot, 'time': self.time, 'NR': self.nw, 'NZ': self.nh,
-                      'Xdim': self.data.get('rdim'), 'Zdim': self.data.get('zdim'),
-                      'R0': abs(self.data.get('rcentr')), 'R1': self.data.get('rleft'),
-                      'Zmid': self.data.get('zmid'), 'RmAxis': self.rmaxis, 'ZmAxis': self.zmaxis,
+                      'Xdim': self.rdim, 'Zdim': self.zdim,
+                      'R0': self.R0, 'R1': self.R1,
+                      'Zmid': self.Zmid, 'RmAxis': self.rmaxis, 'ZmAxis': self.zmaxis,
                       'psiAxis': self.siAxis, 'psiSep': self.siBry, 'Bt0': self.bcentr,
-                      'Ip': self.data.get('current'), 'Fpol': self.PROFdict['fpol'],
+                      'Ip': self.Ip, 'Fpol': self.PROFdict['fpol'],
                       'Pres': self.PROFdict['pres'], 'FFprime': self.PROFdict['ffprime'],
                       'Pprime': self.PROFdict['pprime'], 'qpsi': self.PROFdict['q_prof'],
                       'q': self.PROFdict['q_prof'], 'psiRZ': self.PSIdict['psi2D'],
                       'R': self.RZdict['Rs1D'], 'Z': self.RZdict['Zs1D'], 'dR': self.RZdict['dR'],
                       'dZ': self.RZdict['dZ'], 'psiRZn': self.PSIdict['psiN_2D'],
-                      'Nlcfs': self.data.get('nbbbs'), 'Nwall': self.data.get('limitr'),
-                      'lcfs': np.vstack((self.data.get('rbbbs'), self.data.get('zbbbs'))).T,
-                      'wall': np.vstack((self.data.get('rlim'), self.data.get('zlim'))).T,
+                      'Nlcfs': len(self.lcfs), 'Nwall': len(self.wall),
+                      'lcfs': self.lcfs, 'wall':self.wall, 
                       'psi': self.PSIdict['psi1D'], 'psiN': self.PSIdict['psiN1D'],'Rsminor': self.Rsminor,
                       'kappa': shape['kappa'], 'triUP': shape['triUP'][0], 'triLO': shape['triLO'][0], 
                       'aminor': shape['aminor'], 'aspect': shape['aspect']}
@@ -283,9 +283,9 @@ class equilParams:
             dpsi = (self.siBry - self.siAxis)/(self.nw - 1) * 2*np.pi
             #try except to accomodate multiple versions of scipy (after 1.6 cumtrapz -> cumulative_trapezoid)
             try:
-                hold = integ.cumtrapz(self.PROFdict['q_prof'], dx=dpsi) * np.sign(self.data.get('bcentr'))
+                hold = integ.cumtrapz(self.PROFdict['q_prof'], dx=dpsi) * np.sign(self.bcentr)
             except:
-                hold = integ.cumulative_trapezoid(self.PROFdict['q_prof'], dx=dpsi) * np.sign(self.data.get('bcentr'))
+                hold = integ.cumulative_trapezoid(self.PROFdict['q_prof'], dx=dpsi) * np.sign(self.bcentr)
             psitor = np.append(0, hold)
             psitorN1D = (psitor - psitor[0])/(psitor[-1] - psitor[0])
             return {'psitorN1D': psitorN1D, 'psitor1D': psitor}
@@ -475,7 +475,7 @@ class equilParams:
 
             # parallel current calc
             # <jpar> = <(J (dot) B)>/B0 = (fprime*<B^2>/mu0 + pprime*fpol)/B0
-            jpar1D = (PROFdict['fprime']*Bsqrd_prof/mu0 + PROFdict['pprime']*PROFdict['fpol']) / self.bcentr/1.e6 * np.sign(self.data.get('current'))
+            jpar1D = (PROFdict['fprime']*Bsqrd_prof/mu0 + PROFdict['pprime']*PROFdict['fpol']) / self.bcentr/1.e6 * np.sign(self.Ip)
 
             # <jtor> = <R*pprime + ffprime/R/mu0>
             # jtor1D = np.abs(self.Rsminor*PROFdict['pprime'] +(PROFdict['ffprime']/self.Rsminor/mu0))/1.e6
@@ -507,7 +507,7 @@ class equilParams:
                 jtor1D[i] = FluxSurfList[i]['FS'].average(f_jtorSurf)
 
             # <jtor> = <R*pprime + ffprime/R/mu0>
-            jtor1D = np.abs(jtor1D)/1.e6 * np.sign(self.data.get('current'))
+            jtor1D = np.abs(jtor1D)/1.e6 * np.sign(self.Ip)
             return jtor1D
 
 
@@ -593,8 +593,8 @@ class equilParams:
             r = np.zeros(theta.shape)
 
             # get maximum r from separatrix in g-file
-            Rsep = self.data.get('rbbbs')
-            Zsep = self.data.get('zbbbs')
+            Rsep = self.g['lcfs'][:,0]
+            Zsep = self.g['lcfs'][:,1]
             idxup = Zsep.argmax()
             idxdwn = Zsep.argmin()
             rup = np.sqrt((Rsep[idxup] - self.rmaxis)**2 + (Zsep[idxup] - self.zmaxis)**2)
@@ -630,16 +630,17 @@ class equilParams:
             jR /= mu0
             jZ /= mu0
             jtor /= mu0
-
-            idx = np.where((self.PSIdict['psiN_2D'] > 1.0) | (abs(self.RZdict['Zs2D']) > abs(self.data.get('zbbbs')).max()))
+            
+            Zsep = self.g['lcfs'][:,1]
+            idx = np.where((self.PSIdict['psiN_2D'] > 1.0) | (abs(self.RZdict['Zs2D']) > abs(Zsep.max())))
             jR[idx] = 0
             jZ[idx] = 0
             jtor[idx] = 0
 
-            jpar = (jR*self.B_R + jZ*self.B_Z + jtor*self.Bt_2D) * np.sign(self.data.get('current'))
+            jpar = (jR*self.B_R + jZ*self.B_Z + jtor*self.Bt_2D) * np.sign(self.Ip)
             jpar /= np.sqrt(self.B_R**2 + self.B_Z**2 + self.Bt_2D**2)
             jtot = np.sqrt(jR**2 + jZ**2 + jtor**2)
-            jtor *= np.sign(self.data.get('current'))
+            jtor *= np.sign(self.Ip)
 
             return {'R':self.RZdict['Rs2D'], 'Z':self.RZdict['Zs2D'], 'j2D':jtot, 'jpar2D':jpar,
                     'jR2D':jR, 'jZ2D':jZ, 'jtor2D':jtor}
@@ -783,11 +784,11 @@ class equilParams:
             print('NZ = ', self.nh,'\t\t Z grid points')
             print('dR = ', format(self.RZdict['dR'],'.4g'),'\t\t R grid resolution in [m]')
             print('dZ = ', format(self.RZdict['dZ'],'g'),'\t\t Z grid resolution in [m]')
-            print('Xdim = ', format(self.data.get('rdim'),'g'),'\t\t total R grid length in [m]')
-            print('Zdim = ', format(self.data.get('zdim'),'g'),'\t\t total Z grid length in [m]')
-            print('R0 = ', format(abs(self.data.get('rcentr')),'g'),'\t\t center point in R in [m]')
-            print('R1 = ', format(self.data.get('rleft'),'g'),'\t\t min grid point in R in [m]')
-            print('Zmid = ', format(self.data.get('zmid'),'g'),'\t\t center point in Z in [m]')
+            print('Xdim = ', format(self.rdim,'g'),'\t\t total R grid length in [m]')
+            print('Zdim = ', format(self.zdim,'g'),'\t\t total Z grid length in [m]')
+            print('R0 = ', format(abs(self.R0),'g'),'\t\t center point in R in [m]')
+            print('R1 = ', format(self.R1,'g'),'\t\t min grid point in R in [m]')
+            print('Zmid = ', format(self.Zmid,'g'),'\t\t center point in Z in [m]')
             print('--- Shape ---')
             print('RmAxis = ', format(self.rmaxis,'g'),'\t R of magnetic axis in [m]')
             print('ZmAxis = ', format(self.zmaxis,'g'),'\t Z of magnetic axis in [m]')
@@ -796,15 +797,15 @@ class equilParams:
             print('kappa = ', format(self.g['kappa'],'g'),'\t elongation')
             print('triUP = ', format(self.g['triUP'],'g'),'\t upper triangularity')
             print('triLO = ', format(self.g['triLO'],'g'),'\t lower triangularity')
-            print('Nlcfs = ', self.data.get('nbbbs'),'\t\t number of separatrix points')
+            print('Nlcfs = ', len(self.lcfs),'\t\t number of separatrix points')
             print('--- Plasma ---')
             print('psiAxis = ', format(self.siAxis,'g'),'\t poloidal flux at magnetic axis in [Wb]')
             print('psiSep = ', format(self.siBry,'g'),'\t poloidal flux at separatrix in [Wb]')
             print('Bt0 = ', format(self.bcentr,'g'),'\t toroidal field at R0 in [T]')
-            print('Ip = ', self.data.get('current'),'\t total plasma current in [A]')
+            print('Ip = ', int(self.Ip),'\t total plasma current in [A]')
             print('helicity = ', self.isHelicity,'\t\t helicity = sign(Bp/Bt) = sign(Ip/Bt0)')
             print('--- Wall ---')
-            print('Nwall = ', self.data.get('limitr'),'\t\t number of wall limiter points')
+            print('Nwall = ', len(self.wall),'\t\t number of wall limiter points')
             print('-----------------------------------------------------------------------')
             print('------------ List of all arrays in self.g -----------------------------')
             print('-----------------------------------------------------------------------')
@@ -833,7 +834,6 @@ class equilParams:
             print('   curvature and shear, 2D current density, and more...')
             print('Current code version is: ', _VERSION)
             
-
         # --------------------------------------------------------------------------------
         def length_along_wall(self):
             """
@@ -1324,8 +1324,8 @@ class equilParams:
             rnorm = unitv**(radexp/2.0)
 
             # get r at last closed flux surface
-            R_lcfs = self.data.get('rbbbs')
-            Z_lcfs = self.data.get('zbbbs')
+            R_lcfs = self.g['lcfs'][:,0]
+            Z_lcfs = self.g['lcfs'][:,1]
             r_lcfs = self.__get_r__(R_lcfs, Z_lcfs)[1::]        # here first == last, so skip first
             th_lcfs = self.__get_theta__(R_lcfs, Z_lcfs)[1::]   # here first == last, so skip first
             index = np.argsort(th_lcfs) # th-lcfs needs to be monotonically increasing
