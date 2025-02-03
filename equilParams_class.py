@@ -5,8 +5,8 @@ First Implemented: Sep. 10. 2012
 Please report bugs to: wingen@fusion.gat.com
 Python 3 version
 """
-_VERSION = 5.01
-_LAST_UPDATE = 'May 15. 2023'
+_VERSION = 5.1
+_LAST_UPDATE = 'Nov 22. 2024'
 
 import os
 import numpy as np
@@ -107,25 +107,30 @@ class equilParams:
             self.BZFunc = interp.RectBivariateSpline(self.RZdict['Rs1D'], self.RZdict['Zs1D'],
                                                      self.B_Z.T)
 
+            shape = self.get_FluxShape(1.0)	# {'kappa', 'tri_avg', 'triUP', 'triLO', 'aminor', 'aspect', 'radius'}
+
             # ---- g dict ----
-            self.g = {'shot': self.shot, 'time': time, 'NR': self.nw, 'NZ': self.nh,
-                      'Xdim': self.rdim, 'Zdim': self.zdim,
-                      'R0': self.R0, 'R1': self.R1,
-                      'Zmid': self.Zmid, 'RmAxis': self.rmaxis, 'ZmAxis': self.zmaxis,
+            self.g = {'shot': shot, 'time': time, 'NR': self.nw, 'NZ': self.nh,
+                      'Xdim': self.data.get('rdim'), 'Zdim': self.data.get('zdim'),
+                      'R0': abs(self.data.get('rcentr')), 'R1': self.data.get('rleft'),
+                      'Zmid': self.data.get('zmid'), 'RmAxis': self.rmaxis, 'ZmAxis': self.zmaxis,
                       'psiAxis': self.siAxis, 'psiSep': self.siBry, 'Bt0': self.bcentr,
-                      'Ip': self.Ip, 'Fpol': self.PROFdict['fpol'],
+                      'Ip': self.data.get('current'), 'Fpol': self.PROFdict['fpol'],
                       'Pres': self.PROFdict['pres'], 'FFprime': self.PROFdict['ffprime'],
                       'Pprime': self.PROFdict['pprime'], 'qpsi': self.PROFdict['q_prof'],
                       'q': self.PROFdict['q_prof'], 'psiRZ': self.PSIdict['psi2D'],
                       'R': self.RZdict['Rs1D'], 'Z': self.RZdict['Zs1D'], 'dR': self.RZdict['dR'],
                       'dZ': self.RZdict['dZ'], 'psiRZn': self.PSIdict['psiN_2D'],
-                      'Nlcfs': len(self.lcfs), 'Nwall': len(self.wall),
-                      'lcfs': self.lcfs, 'wall':self.wall, 
-                      'psi': self.PSIdict['psi1D'], 'psiN': self.PSIdict['psiN1D'],'Rsminor': self.Rsminor
-                      }
-            
+                      'Nlcfs': self.data.get('nbbbs'), 'Nwall': self.data.get('limitr'),
+                      'lcfs': np.vstack((self.data.get('rbbbs'), self.data.get('zbbbs'))).T,
+                      'wall': np.vstack((self.data.get('rlim'), self.data.get('zlim'))).T,
+                      'psi': self.PSIdict['psi1D'], 'psiN': self.PSIdict['psiN1D'],'Rsminor': self.Rsminor,
+                      'kappa': shape['kappa'], 'triUP': shape['triUP'][0], 'triLO': shape['triLO'][0], 
+                      'aminor': shape['aminor'], 'aspect': shape['aspect']}
                       
             self.Swall, self.Swall_max = self.length_along_wall()
+            self.isHelicity = self.helicity()
+            self.g['helicity'] = self.isHelicity
             self.FluxSurfList = None
             return
 
@@ -214,7 +219,6 @@ class equilParams:
 
             return
 
-
         def readNetCDF(self, filename, nc_time):
             """
             reads an IMAS formatted equilibrium netcdf
@@ -223,8 +227,7 @@ class equilParams:
             self.data = imas_nc.readNetCDF(filename, nc_time)
 
             return
-
-
+          
         # --------------------------------------------------------------------------------
         # Interpolation function handles for all 1-D fields in the g-file
         def profiles(self, BtMult):
@@ -316,10 +319,11 @@ class equilParams:
 
             b = (FluxSur['Zs'].max()-FluxSur['Zs'].min())/2
             a = (FluxSur['Rs'].max()-FluxSur['Rs'].min())/2
+            R = (FluxSur['Rs'].max()+FluxSur['Rs'].min())/2
             d = (FluxSur['Rs'].min()+a) - FluxSur['Rs'][np.where(FluxSur['Zs'] == FluxSur['Zs'].max())]
             c = (FluxSur['Rs'].min()+a) - FluxSur['Rs'][np.where(FluxSur['Zs'] == FluxSur['Zs'].min())]
 
-            return {'kappa': (b/a), 'tri_avg': (c+d)/2/a, 'triUP': (d/a), 'triLO': (c/a)}
+            return {'kappa': (b/a), 'tri_avg': (c+d)/2/a, 'triUP': (d/a), 'triLO': (c/a), 'aminor': a, 'aspect': R/a, 'radius': R}
 
         # --------------------------------------------------------------------------------
         # (R,Z) and B-fields for all flux surfaces given by 1-D normalized poloidal flux array psiN1D
@@ -667,6 +671,166 @@ class equilParams:
                 plt.ylabel('Z [m]')
                 plt.gca().set_aspect('equal')
                 plt.title('Shot: ' + str(self.g['shot']) + '   Time: ' + str(self.g['time']) + ' ms', fontsize = 18)
+
+        # --------------------------------------------------------------------------------
+        def plotProfile(self, what = 'all', fig = None, c = None, label = ''):
+            """
+            what: keyword of what profile to plot. default is 'all' and plots all 6 relevant profiles
+            fig: integer number of figure window to use, e.g. 1
+            c: string of color code, e.g. 'k' or 'r'
+            label: string that becomes the label for the plot in the legend
+            """
+            import matplotlib.pyplot as plt
+            if c is None: c = 'k'
+            
+            psi = self.PSIdict['psiN1D']
+            
+            if what in ['p','P','Pres','pres','pressure','Ptot','ptot','Press','press','Pressure']:
+                ylabel = 'p$_{tot}$ [kPa]'
+                y = self.PROFdict['pres']*1e-3
+            elif what in ['q','qprof','q_prof']:
+                ylabel = 'q'
+                y = self.PROFdict['q_prof']
+            elif what in ['j','jtor','current density','J']:
+                ylabel = "j$_{tor}$ [MA/m$^2$]"
+                y = self.jtor_profile()
+            elif what in ['I','Ip','current']:
+                from scipy.integrate import cumtrapz
+                ylabel = "I [MA]"
+                FluxSurfList = self.get_allFluxSur()
+                jtor = self.jtor_profile(FluxSurfList)
+                Vprime = self.volume2D(FluxSurfList)['Vprime']
+                y = np.append(0, cumtrapz(jtor * Vprime, psi)) # current profile: I = integral(jtor dV) = integral(jtor * dV/dpsi * dpsi) = integral(jtor * dV/dpsi * dpsi/ds * ds)
+            elif what in ['F','f','fpol','Fpol']:
+                ylabel = 'F$_{pol}$ [Tm]'
+                y = self.PROFdict['fpol']
+            elif what in ['pprime','Pprime','gradP']:
+                ylabel = "dp/d$\\psi$ [kPa]"
+                y = self.PROFdict['pprime']*1e-3
+            elif what in ['ffprime','FFprime']:
+                ylabel = 'F dF/d$\\psi$ [T$^2$m$^2$]'
+                y = self.PROFdict['ffprime']
+           
+            if what in ['all']:
+                jtor = self.jtor_profile()
+    
+                fig = plt.figure(figsize = (15,11))
+                
+                ax1 = fig.add_subplot(321, aspect = 'auto')
+                ax1.set_xlim(0,1)
+                ax1.set_ylabel('p$_{tot}$ [kPa]')
+                ax1.get_xaxis().set_ticklabels([])
+                ax1.plot(psi, self.PROFdict['pres']*1e-3, '-', color = c, lw = 2)
+                
+                ax2 = fig.add_subplot(323, aspect = 'auto')
+                ax2.set_xlim(0,1)
+                ax2.set_ylabel('q')
+                ax2.get_xaxis().set_ticklabels([])
+                ax2.plot(psi, self.PROFdict['q_prof'], '-', color = c, lw = 2)
+                
+                ax3 = fig.add_subplot(325, aspect = 'auto')
+                ax3.set_xlim(0,1)
+                ax3.set_ylabel("dI/d$\\psi$ [MA]")
+                ax3.set_xlabel('$\\psi$')
+                ax3.plot(psi, jtor, '-', color = c, lw = 2)
+                
+                ax4 = fig.add_subplot(322, aspect = 'auto')
+                ax4.set_xlim(0,1)
+                ax4.set_ylabel('F$_{pol}$ [Tm]')
+                ax4.get_xaxis().set_ticklabels([])
+                ax4.plot(psi, self.PROFdict['fpol'], '-', color = c, lw = 2)
+                
+                ax5 = fig.add_subplot(324, aspect = 'auto')
+                ax5.set_xlim(0,1)
+                ax5.set_ylabel("dp/d$\\psi$ [kPa]")
+                ax5.get_xaxis().set_ticklabels([])
+                ax5.plot(psi, self.PROFdict['pprime']*1e-3, '-', color = c, lw = 2)
+                
+                ax6 = fig.add_subplot(326, aspect = 'auto')
+                ax6.set_xlim(0,1)
+                ax6.set_ylabel('F dF/d$\\psi$ [T$^2$m$^2$]')
+                ax6.set_xlabel('$\\psi$')
+                ax6.plot(psi, self.PROFdict['ffprime'], '-', color = c, lw = 2)
+            else:
+                if fig is None: 
+                    fig = plt.figure()
+                    plt.xlim(0,1)
+                    plt.xlabel('$\\psi$')
+                    plt.ylabel(ylabel)
+                else: 
+                    fig = plt.figure(fig)
+                ax = fig.gca()
+                ax.plot(psi, y, '-', color = c, lw = 2, label = label)
+                if len(label) > 0: plt.legend()
+                
+            fig.tight_layout()
+
+        # --------------------------------------------------------------------------------
+        def help(self):
+            """
+            prints list of all 0D parameters in EFIT
+            as well as information on available profiles and functions
+            """
+            print('-----------------------------------------------------------------------')
+            print('------------ List of all parameters in self.g -------------------------')
+            print('-----------------------------------------------------------------------')
+            print('shot = ', self.g['shot'])
+            print('time = ', self.g['time'])
+            print('--- Grid ---')
+            print('NR = ', self.nw,'\t\t R grid points')
+            print('NZ = ', self.nh,'\t\t Z grid points')
+            print('dR = ', format(self.RZdict['dR'],'.4g'),'\t\t R grid resolution in [m]')
+            print('dZ = ', format(self.RZdict['dZ'],'g'),'\t\t Z grid resolution in [m]')
+            print('Xdim = ', format(self.data.get('rdim'),'g'),'\t\t total R grid length in [m]')
+            print('Zdim = ', format(self.data.get('zdim'),'g'),'\t\t total Z grid length in [m]')
+            print('R0 = ', format(abs(self.data.get('rcentr')),'g'),'\t\t center point in R in [m]')
+            print('R1 = ', format(self.data.get('rleft'),'g'),'\t\t min grid point in R in [m]')
+            print('Zmid = ', format(self.data.get('zmid'),'g'),'\t\t center point in Z in [m]')
+            print('--- Shape ---')
+            print('RmAxis = ', format(self.rmaxis,'g'),'\t R of magnetic axis in [m]')
+            print('ZmAxis = ', format(self.zmaxis,'g'),'\t Z of magnetic axis in [m]')
+            print('aminor = ', format(self.g['aminor'],'g'),'\t minor radius in [m]')
+            print('aspect = ', format(self.g['aspect'],'g'),'\t aspect ratio')
+            print('kappa = ', format(self.g['kappa'],'g'),'\t elongation')
+            print('triUP = ', format(self.g['triUP'],'g'),'\t upper triangularity')
+            print('triLO = ', format(self.g['triLO'],'g'),'\t lower triangularity')
+            print('Nlcfs = ', self.data.get('nbbbs'),'\t\t number of separatrix points')
+            print('--- Plasma ---')
+            print('psiAxis = ', format(self.siAxis,'g'),'\t poloidal flux at magnetic axis in [Wb]')
+            print('psiSep = ', format(self.siBry,'g'),'\t poloidal flux at separatrix in [Wb]')
+            print('Bt0 = ', format(self.bcentr,'g'),'\t toroidal field at R0 in [T]')
+            print('Ip = ', self.data.get('current'),'\t total plasma current in [A]')
+            print('helicity = ', self.isHelicity,'\t\t helicity = sign(Bp/Bt) = sign(Ip/Bt0)')
+            print('--- Wall ---')
+            print('Nwall = ', self.data.get('limitr'),'\t\t number of wall limiter points')
+            print('-----------------------------------------------------------------------')
+            print('------------ List of all arrays in self.g -----------------------------')
+            print('-----------------------------------------------------------------------')
+            print('Fpol','\t\t\t 1D profile of R * Btor in [Tm] vs. psiN')
+            print('Pres','\t\t\t 1D pressure profile in [Pa] vs. psiN')
+            print('FFprime','\t\t 1D profile of Fpol * dFpol/dpsi vs. psiN')
+            print('Pprime','\t\t\t 1D profile of dPres/dpsi vs. psiN')
+            print('q','\t\t\t 1D safety factor profile vs. psiN')
+            print('psiN','\t\t\t 1D array of normalized poloidal flux (psi-psiAxis)/(psiSep-psiAxis)')
+            print('psiRZ','\t\t\t 2D array or poloidal flux psi in [Wb] on RZ grid')
+            print('R','\t\t\t 1D array of R')
+            print('Z','\t\t\t 1D array of R')
+            print('lcfs', '\t\t\t array of (R,Z) of separatrix')
+            print('wall', '\t\t\t array of (R,Z) of wall limiter')
+            print('-----------------------------------------------------------------------')
+            print('------------ Info on available functionality --------------------------')
+            print('-----------------------------------------------------------------------')
+            print('Use the .plot() function to show the poloidal cross section')
+            print('Use the .plotProfile() function to show all profiles, or')
+            print("   .plotProfile(keyword) with keyword in ['Fpol','Pres','FFprime','Pprime','q','jtor','Ip']")
+            print('   to show each profile individually')
+            print('1D interpolations of profiles are readily available in .PROFdict')
+            print('2D Interpolations on the R,Z grid are readily available via')
+            print('   .psiFunc.ev(R,Z),  .BRFunc.ev(R,Z),  .BZFunc.ev(R,Z),  .BpFunc.ev(R,Z),  .BtFunc.ev(R,Z)')
+            print('Further available functions include: strike line locations, flux expansion, Swall cooridante transformations,')
+            print('   curvature and shear, 2D current density, and more...')
+            print('Current code version is: ', _VERSION)
+            
 
         # --------------------------------------------------------------------------------
         def length_along_wall(self):
@@ -1054,6 +1218,31 @@ class equilParams:
             Bp_div = self.BpFunc.ev(Rdiv,Zdiv)
             
             return (Rmid*Bp_mid) / (Rdiv*Bp_div)
+            
+        
+         # --------------------------------------------------------------------------------
+        def helicity(self):
+            """
+            Calculate helicity from psiRZ and Fpol
+            verify with Bt and Ip signs
+            """
+            # get a point at outboard midplane, near the separatrix
+            nR,nZ = abs(self.g['R'] - self.g['lcfs'][:,0].max()).argmin(), int(self.g['NZ']/2)
+            
+            # helicity = -sign(Bz/Bphi) at outboard midplane
+            # Bz = -dpsidR / R;		Bphi = Fpol / R;	Fpol ~ Bt0 * R0;	Bz ~ Ip / (R-R0)
+            isHelicity = np.sign(self.dpsidR[nZ,nR]/self.g['Fpol'][-1])
+            expectHelicity = np.sign(self.g['Ip']/self.g['Bt0'])
+            
+            if not (expectHelicity == isHelicity):
+            	print('Helicity is inconsistent in g-File')
+            	if not (np.sign(self.g['Bt0']) == np.sign(self.g['Fpol'][-1])):
+            		print('Flip sign of Bt in g-file')
+            	else:
+            		print('Flip sign of Ip in g-file')
+            
+            return int(isHelicity)
+        
 
         # --------------------------------------------------------------------------------
         # --------------------------------------------------------------------------------
