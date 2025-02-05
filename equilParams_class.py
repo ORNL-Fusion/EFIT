@@ -55,8 +55,8 @@ class equilParams:
                 self.data = imas_nc.readNetCDF(filename, time)
             elif EQmode == 'json':
                 print("JSON EQmode")
-                imas_js = IMAS_EQ.JSON_IMAS()
-                self.data = imas_js.readJSON(filename, time)
+                imas_js = IMAS_EQ.JSON_IMAS(filename)
+                self.data = imas_js.getEQ(time)
             else:
                 #print("GEQDSK EQmode")
                 GEQDSKflag = True
