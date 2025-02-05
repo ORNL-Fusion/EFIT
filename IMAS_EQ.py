@@ -44,6 +44,8 @@ class JSON_IMAS:
 		
 		self.eqd = None
 		self.profiles = None
+		self.shot = None
+		self.time = None
 		
 		with open(filename, 'r') as file:
 			self.data = json.load(file) 
@@ -51,7 +53,7 @@ class JSON_IMAS:
 		return
 
 
-	def getEQ(self, time, psiMult=1.0, BtMult=1.0, IpMult=1.0):
+	def getEQ(self, time, shot = None, psiMult = 1.0, BtMult = 1.0, IpMult = 1.0):
 		"""
 		Sets the time slice and assigns to the parameters we use in the equilParams_class ep object
 		"""		   
@@ -62,7 +64,9 @@ class JSON_IMAS:
 			return
 
 		eqt = self.data['equilibrium']['time_slice'][tIdx]
-		wall = self.data['wall']		
+		wall = self.data['wall']	
+		if shot is None: self.shot = 1
+		self.time = time	
 
 		d = {}
 		#ep object name left of '='
@@ -112,7 +116,8 @@ class JSON_IMAS:
 		d['wall'] = np.vstack((d['Rwall'], d['Zwall'])).T
 		d['rdim'] = d['Rmax'] - d['Rmin']
 		d['zdim'] = d['Zmax'] - d['Zmin']
-		d['R0'] = eqt['global_quantities']['magnetic_axis']['r']
+		#d['R0'] = eqt['global_quantities']['magnetic_axis']['r']
+		d['R0'] = d['rcentr']
 		d['R1'] = d['Rmin']
 		d['Zmid'] = 0.0
 		d['Ip'] = eqt['global_quantities']['ip'] * IpMult
@@ -170,13 +175,13 @@ class JSON_IMAS:
 		norm = [1e20, 1e3]	# normalize before profile fitting
 		if len(d['psi']) < 100: 
 			N = 101
-			upscale = True
+			upscale = True		# this is very important in making a better tanh curve fit 
 		else: upscale = False
 		
 		for i,key in enumerate(['ne','Te']):
 			#print(key)
 			if upscale:
-				f = scinter.PchipInterpolator(d['psi'], d[key]/norm[i])		# this gets overwritten by a smooth profile fit
+				f = scinter.PchipInterpolator(d['psi'], d[key]/norm[i])		# this gets overwritten by a smooth profile fit later
 				x = np.linspace(0,1,N)
 				y = f(x)
 			else: x,y = d['psi'], d[key]/norm[i]
@@ -209,7 +214,7 @@ class JSON_IMAS:
 		d['extend']['p'] = f(d['extend']['Vpsi'])
 		
 		self.profiles = d
-		self.correct_ni()
+		self.correct_ni(asymptote = nsol*norm[0])
 		self.extendPressure()
 		return
 
@@ -235,9 +240,10 @@ class JSON_IMAS:
 		return #p,psi_new,p_new
 		
 
-	def correct_ni(self):
+	def correct_ni(self, asymptote = 0):
 		"""		
 		Correct main ion ni, so that p - sum(n*T) >= 0 for all points in p = self.profiles['p']
+		Then extrapolate ni using exponential decay and interpolate ni on extended psi grid
 		"""
 		e = 1.60217663e-19
 		
@@ -265,38 +271,50 @@ class JSON_IMAS:
 		idx = np.where(d < 0)[0]
 		if len(idx) == 0: return	# done, d >=0 everywhere already
 		
-		# where d < 0 replace ni with new value so that  p - sum(n*T) >= 0 -> ni_patched
+		# where d < 0 replace ni with new value so that  p - sum(n*T) >= 0 -> ni patched
 		ni0 = (self.profiles['p'] - netex - impx) / tix		# this ni would make d = 0 everywhere
-		ni_patched = self.profiles[ion]['ni'].copy()
-		ni_patched[idx] = ni0[idx]*0.999	# give it a tiny margin
+		niPatched = self.profiles[ion]['ni'].copy()
+		niPatched[idx] = ni0[idx]*0.999	# give it a tiny margin
 		
-		# append ni_patched and ni_extended(psi > 1.18) to keep the asymptotic value
-		xmax = self.profiles['extend']['psi'].max()
-		idx = np.where(self.profiles['extend']['psi'] > (xmax - 0.02))[0]
-		psi_patched = np.append(self.profiles['psi'], self.profiles['extend']['psi'][idx])
-		ni_patched = np.append(ni_patched, self.profiles['extend'][ion]['ni'][idx])
-		
-		# Use a monotonic interpolation for ni_patched -> new ni
+		# Use a monotonic interpolation for ni_patched -> upscale ni to extended psi grid
 		# !!!!!!! This interpolator does not overshoot like UnivariateSpline, but instead maintains a monotonic curve !!!!!!!!!!!!
 		# However, this is not as smooth as a regular spline. The first derivatives are guaranteed to be continuous, but the second derivatives may jump
-		f = scinter.PchipInterpolator(psi_patched, ni_patched)
-		ni_new = f(self.profiles['extend']['psi'])
-		fni = scinter.UnivariateSpline(self.profiles['extend']['psi'], ni_new, s = 0)
+		f = scinter.PchipInterpolator(x, niPatched)
+		sol = self.profiles['extend']['psi'] > 1
+		psiCore = self.profiles['extend']['psi'][~sol]
+		y = f(psiCore)
+		
+		# Point and derivative at separatrix using the extended psi grid
+		x1 = psiCore[-1]	# this should be  = 1
+		y1 = y[-1]
+		dx = psiCore[1] - psiCore[0]
+		dy1 = (0.5*y[-3] - 2*y[-2] + 1.5*y[-1])/dx	# 2nd order 
+		
+		# Fit exponential decay f(x) = a*exp(b*x) + c; c = asymptote is given as input
+		c = asymptote
+		b = dy1/(y1 - c)
+		a = dy1/b * np.exp(-b*x1)
+		
+		# extend ni
+		f = lambda x: a*np.exp(b*x) + c
+		niNew = np.append(y, f(self.profiles['extend']['psi'][sol]))
 		
 		# verify & update
-		p2 = netex + fni(x) * tix + impx 
+		fni = scinter.UnivariateSpline(self.profiles['extend']['psi'], niNew, s = 0)
+		p2 = netex + fni(x) * tix + impx 	# Use original psi grid
 		d2 = self.profiles['p'] - p2
 		if any(d2 < 0): 
 			print('Sum of n*T exceeds thermal pressure inside the separatrix. Check extended profiles.')
 		else: 
 			print('ni correction okay')
-			self.profiles['extend'][ion]['ni'] = ni_new
-		return #x,p,d,ni0,psi_patched,ni_patched,ni_new,p2,d2
+			self.profiles['extend'][ion]['ni'] = niNew
+		return #x,p,d,ni0,niPatched,niNew,p2,d2
 		
 		
 	def checkExtension(self):
 		"""
 		Verify that p - sum(n*T) >= 0
+		Using the extended psi grid
 		"""
 		e = 1.60217663e-19
 		p = self.profiles['extend']['ne'] * self.profiles['extend']['Te']*e
@@ -311,7 +329,7 @@ class JSON_IMAS:
 		return #p,d
 		
 	
-	def plotProfile(self, what = 'all', fig = None, c = None, label = '', extended = False):
+	def plotProfile(self, what = 'all', fig = None, c = None, label = '', extended = False, style = None):
 		"""
 		what: keyword of what profile to plot. default is 'all' and plots all 6 relevant profiles
 		fig: integer number of figure window to use, e.g. 1
@@ -321,6 +339,7 @@ class JSON_IMAS:
 		"""
 		import matplotlib.pyplot as plt
 		if c is None: c = 'k'
+		if style is None: style = '-'
 		
 		if extended: profiles = self.profiles['extend']
 		else: profiles = self.profiles
@@ -357,8 +376,8 @@ class JSON_IMAS:
 			ax1.set_xlim(0,x.max())
 			ax1.get_xaxis().set_ticklabels([])
 			if extended: 
-				ax1.plot(x, y, 'k-', lw = 2)
-				ax1.plot(self.profiles['psi'], self.profiles['p']*1e-3, 'r-', lw = 2)
+				ax1.plot(x, y, style, color = 'k', lw = 2)
+				ax1.plot(self.profiles['psi'], self.profiles['p']*1e-3, style, color = 'r', lw = 2)
 			else: ax1.plot(x, y, '-', color = c, lw = 2)
 			ax1.set_ylim(bottom=0)
 			
@@ -368,8 +387,8 @@ class JSON_IMAS:
 			ax2.set_xlim(0,x.max())
 			ax2.get_xaxis().set_ticklabels([])
 			if extended: 
-				ax2.plot(x, y, 'k-', lw = 2)
-				ax2.plot(self.profiles['psi'], self.profiles['ne']*1e-20, 'r-', lw = 2)
+				ax2.plot(x, y, style, color = 'k', lw = 2)
+				ax2.plot(self.profiles['psi'], self.profiles['ne']*1e-20, style, color = 'r', lw = 2)
 			else: ax2.plot(x, y, '-', color = c, lw = 2)
 			ax2.set_ylim(bottom=0)
 			
@@ -379,8 +398,8 @@ class JSON_IMAS:
 			ax3.set_xlim(0,x.max())
 			ax3.set_xlabel('$\\psi$')
 			if extended: 
-				ax3.plot(x, y, 'k-', lw = 2)
-				ax3.plot(self.profiles['psi'], self.profiles['Te']*1e-3, 'r-', lw = 2)
+				ax3.plot(x, y, style, color = 'k', lw = 2)
+				ax3.plot(self.profiles['psi'], self.profiles['Te']*1e-3, style, color = 'r', lw = 2)
 			else: ax3.plot(x, y, '-', color = c, lw = 2)
 			ax3.set_ylim(bottom=0)
 			
@@ -390,8 +409,8 @@ class JSON_IMAS:
 			ax4.set_xlim(0,x.max())
 			ax4.get_xaxis().set_ticklabels([])
 			if extended: 
-				ax4.plot(profiles['Vpsi'], y, '-', lw = 2)
-				ax4.plot(self.profiles['psi'], self.profiles['V'], 'r-', lw = 2)
+				ax4.plot(profiles['Vpsi'], y, style, color = 'k', lw = 2)
+				ax4.plot(self.profiles['psi'], self.profiles['V'], style, color = 'r', lw = 2)
 			else: ax4.plot(x, y, '-', color = c, lw = 2)
 			ax4.set_ylim(bottom=0)
 			
@@ -401,8 +420,8 @@ class JSON_IMAS:
 			ax5.set_xlim(0,x.max())
 			ax5.get_xaxis().set_ticklabels([])
 			if extended: 
-				ax5.plot(x, y, 'k-', lw = 2)
-				ax5.plot(self.profiles['psi'], self.profiles[species]['ni']*1e-20, 'r-', lw = 2)
+				ax5.plot(x, y, style, color = 'k', lw = 2)
+				ax5.plot(self.profiles['psi'], self.profiles[species]['ni']*1e-20, style, color = 'r', lw = 2)
 			else: ax5.plot(x, y, '-', color = c, lw = 2)
 			ax5.set_ylim(bottom=0)
 			
@@ -412,8 +431,8 @@ class JSON_IMAS:
 			ax6.set_xlim(0,x.max())
 			ax6.set_xlabel('$\\psi$')
 			if extended: 
-				ax6.plot(x, y, 'k-', lw = 2)
-				ax6.plot(self.profiles['psi'], self.profiles[species]['Ti']*1e-3, 'r-', lw = 2)
+				ax6.plot(x, y, style, color = 'k', lw = 2)
+				ax6.plot(self.profiles['psi'], self.profiles[species]['Ti']*1e-3, style, color = 'r', lw = 2)
 			else: ax6.plot(x, y, '-', color = c, lw = 2)
 			ax6.set_ylim(bottom=0)
 		else:
@@ -425,51 +444,50 @@ class JSON_IMAS:
 			else: 
 				fig = plt.figure(fig)
 			ax = fig.gca()
-			ax.plot(x, y, '-', color = c, lw = 2, label = label)
+			ax.plot(x, y, style, color = c, lw = 2, label = label)
 			plt.ylim(bottom=0)
 			if len(label) > 0: plt.legend()
 			
 		fig.tight_layout()
 	   
 	
-	def writeGEQDSK(self, file, g, shot=None, time=None, ep=None):
+	def writeGEQDSK(self, file, shot = None, time = None):
 		"""
-		writes a new gfile.	 user must supply
+		writes a new gfile.	
+		uses self.eqd:  dictionary containing all GEQDSK parameters
+		User Input:
 		file: name of new gfile
-		g:	  dictionary containing all GEQDSK parameters
 		shot: new shot number
 		time: new shot timestep [ms]
 
 		Note that this writes some data as 0 (ie rhovn, kvtor, etc.)
 		"""
 
-		if shot==None:
-			shot=1
-		if time==None:
-			time=1
+		if shot is None: shot = self.shot
+		if time is None: time = self.time*1e3	# time is in ms in g-file
 		
 		KVTOR = 0
 		RVTOR = 1.7
 		NMASS = 0
-		RHOVN = np.zeros((g['NR']))
+		RHOVN = np.zeros((self.eqd['nw']))
 
 		print('Writing to path: ' +file)
 		with open(file, 'w') as f:
 			f.write('  EFIT	   xx/xx/xxxx	 #' + str(shot) + '	 ' + str(time) + 'ms		')
-			f.write('	3 ' + str(g['NR']) + ' ' + str(g['NZ']) + '\n')
-			f.write('% .9E% .9E% .9E% .9E% .9E\n'%(g['Xdim'], g['Zdim'], g['R0'], g['R1'], g['Zmid']))
-			f.write('% .9E% .9E% .9E% .9E% .9E\n'%(g['RmAxis'], g['ZmAxis'], g['psiAxis'], g['psiSep'], g['Bt0']))
-			f.write('% .9E% .9E% .9E% .9E% .9E\n'%(g['Ip'], 0, 0, 0, 0))
+			f.write('	3 ' + str(self.eqd['nw']) + ' ' + str(self.eqd['nh']) + '\n')
+			f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.eqd['rdim'], self.eqd['zdim'], self.eqd['rcentr'], self.eqd['Rmin'], self.eqd['Zmid']))
+			f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.eqd['rmaxis'], self.eqd['zmaxis'], self.eqd['siAxis'], self.eqd['siBry'], self.eqd['bcentr']))
+			f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.eqd['Ip'], 0, 0, 0, 0))
 			f.write('% .9E% .9E% .9E% .9E% .9E\n'%(0,0,0,0,0))
-			self._write_array(g['Fpol'], f)
-			self._write_array(g['Pres'], f)
-			self._write_array(g['FFprime'], f)
-			self._write_array(g['Pprime'], f)
-			self._write_array(g['psiRZ'].flatten(), f)
-			self._write_array(g['qpsi'], f)
-			f.write(str(g['Nlcfs']) + ' ' + str(g['Nwall']) + '\n')
-			self._write_array(g['lcfs'].flatten(), f)
-			self._write_array(g['wall'].flatten(), f)
+			self._write_array(self.eqd['fpol'], f)
+			self._write_array(self.eqd['pres'], f)
+			self._write_array(self.eqd['ffprime'], f)
+			self._write_array(self.eqd['pprime'], f)
+			self._write_array(self.eqd['psirz'].flatten(), f)
+			self._write_array(self.eqd['qpsi'], f)
+			f.write(str(len(self.eqd['lcfs'])) + ' ' + str(len(self.eqd['wall'])) + '\n')
+			self._write_array(self.eqd['lcfs'].flatten(), f)
+			self._write_array(self.eqd['wall'].flatten(), f)
 			f.write(str(KVTOR) + ' ' + format(RVTOR, ' .9E') + ' ' + str(NMASS) + '\n')
 			self._write_array(RHOVN, f)
 
