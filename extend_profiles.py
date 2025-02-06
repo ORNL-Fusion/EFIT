@@ -5,7 +5,7 @@ import scipy.interpolate as scinter
 import Misc.optimize_profiles as op
 
 def make_profile(x, y, key, asymptote = None, save = False, show = True, 
-				xmin = 0, xmax = 1.2, dx = 0.005,
+				xmin = 0, xmax = 1.2, dx = 0.005, xout = None,
 				matchpoint = None, dxfit = None, SOLdxfit = None):
 	"""
 	Take profile data x,y, extend it to psi = xmax using a tanh with given asymptotic value
@@ -20,6 +20,7 @@ def make_profile(x, y, key, asymptote = None, save = False, show = True,
 	  xmin = min psi for profile fit; the profile fit takes data only from x > xmin; For x < xmin splines are used.
 	  xmax = max psi for profile fit; this is the extrapolation limit
 	  dx = final resolution of profile
+	  xout = optional grid points for the final profile; if given, ignores dx; default is equidistant grid with dx
 	  matchpoint = psi where x < xmin spline and x > xmin fit are matched together. This can be different than xmin, default is xmin
 	  dxfit = number of grid points on the left and right of matchpoint to ignore, so that the match can be made smoother with splines, typically single digit
 	  SOLdxfit = extra number of grid points to ignore on top of dxfit on the psi > matchpoint side; typically 0
@@ -72,10 +73,12 @@ def make_profile(x, y, key, asymptote = None, save = False, show = True,
 		y1 = np.append(y[0:idx1-dxfit],pro0[idx2+dxfit+SOLdxfit::])
 		
 		# spline the combined profile for a smooth curve everywhere
+		# uses the points xout if given, or a equidistant grid with dx otherwise
 		f = scinter.UnivariateSpline(x1, y1, s = 0)
-		psi = np.arange(0,xmax+dx,dx)
+		if xout is None: psi = np.arange(0,xmax+dx,dx)
+		else: psi = xout
 		pro = f(psi)
-	else:	# fit the entire profile, This is usually not a good idea, as the core and edge won't both fit well with the same tanh
+	else:	# fit the entire profile, This is usually not a good idea, as the core and edge won't both fit well with the same tanh; this will ignore xout
 		psi,pro,_ = fit_profile(x, y, asymptote, xlim = [0,xmax], dx = dx)
 		
 	if show: 

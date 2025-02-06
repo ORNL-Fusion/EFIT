@@ -127,7 +127,7 @@ class JSON_IMAS:
 		return d
 	
 	
-	def coreProfiles(self, time, dx = 0.005, xmin = 0.7, xmax = 1.2, nsol = 0.02, Tsol = 1e-4):
+	def coreProfiles(self, time, dx = 0.005, xmin = 0.7, xmax = 1.2, nsol = 0.02, Tsol = 1e-4, preservePoints = True):
 		"""
 		Sets the time slice and gets the profiles form the JSON
 		Sets the member variable self.profiles, a dictionary with keys: ['time', 'ne', 'Te', 'p', 'V', 'rho', 'psi', 'ions', 'D', 'extend']
@@ -173,19 +173,42 @@ class JSON_IMAS:
 		d['extend'] = {}
 		asymptote = [nsol,Tsol]	# this is already normalized
 		norm = [1e20, 1e3]	# normalize before profile fitting
-		if len(d['psi']) < 100: 
-			N = 101
+		
+		# If you want to keep all original points in the profile, but fill in the gaps
+		# divide intervals until number of grid points exceed threshold, given by suggested dx
+		# this assumes non-equidistant grid, as original profiles are likely equidistant in rho, not in psi
+		psi = d['psi'].copy()
+		Npsi = len(psi)		# this is the current number of grid points
+		
+		if Npsi < 100: 			# use equidistant temporary upscaling for smooth profile fits 
+			Nup = 101
 			upscale = True		# this is very important in making a better tanh curve fit 
 		else: upscale = False
+		
+		# this sets the output grid
+		if preservePoints:
+			Nmax = int(1.0/dx) + 1	# this is the threshold
+			while Npsi < Nmax:
+				Npsi = 2*Npsi - 1
+				x = np.zeros(Npsi)
+				x[0::2] = psi
+				x[1::2] = psi[0:-1] + 0.5*np.diff(psi)
+				psi = x
+			# now psi is on higher resolution, but still only [0,1], now extend to xmax
+			psiSol = np.arange(1+dx,xmax+dx,dx)
+			psi = np.append(psi,psiSol)
+			Npsi = len(psi)
+			print(Npsi,psi)
+		else: psi = None
 		
 		for i,key in enumerate(['ne','Te']):
 			#print(key)
 			if upscale:
 				f = scinter.PchipInterpolator(d['psi'], d[key]/norm[i])		# this gets overwritten by a smooth profile fit later
-				x = np.linspace(0,1,N)
+				x = np.linspace(0,1,Nup)
 				y = f(x)
 			else: x,y = d['psi'], d[key]/norm[i]
-			x,y = expro.make_profile(x,y, key, asymptote = asymptote[i], show = False, xmin = xmin, dx = dx)
+			x,y = expro.make_profile(x,y, key, asymptote = asymptote[i], show = True, xmin = xmin, xmax = xmax, dx = dx, xout = psi) # if psi is None, xout is ignored and final grid is np.arange(0,xmax+dx,dx)
 			d['extend'][key] = y*norm[i]
 		d['extend']['psi'] = x
 				
@@ -199,10 +222,10 @@ class JSON_IMAS:
 				#print(key)
 				if upscale:
 					f = scinter.PchipInterpolator(d['psi'], d[ion][key]/norm[i])	# this gets overwritten by a smooth profile fit
-					x = np.linspace(0,1,N)
+					x = np.linspace(0,1,Nup)
 					y = f(x)
 				else: x,y = d['psi'], d[ion][key]/norm[i]
-				x,y = expro.make_profile(x,y, key, asymptote = asymptote[i], show = False, xmin = xmin, dx = dx)
+				x,y = expro.make_profile(x,y, key, asymptote = asymptote[i], show = True, xmin = xmin, xmax = xmax, dx = dx, xout = psi)
 				d['extend'][ion][key] = y*norm[i]
 				
 		# pressure needs special consideration: 
@@ -287,8 +310,8 @@ class JSON_IMAS:
 		# Point and derivative at separatrix using the extended psi grid
 		x1 = psiCore[-1]	# this should be  = 1
 		y1 = y[-1]
-		dx = psiCore[1] - psiCore[0]
-		dy1 = (0.5*y[-3] - 2*y[-2] + 1.5*y[-1])/dx	# 2nd order 
+		dx = psiCore[-1] - psiCore[-2]	# NOT equidistant
+		dy1 = (-y[-2] + y[-1])/dx		# 1st order only due to non-equidistant grid
 		
 		# Fit exponential decay f(x) = a*exp(b*x) + c; c = asymptote is given as input
 		c = asymptote
