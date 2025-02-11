@@ -167,48 +167,12 @@ class JSON_IMAS:
 		
 		
 		# Interpolate profiles to resolution dx, and extrapolate n,T profiles to psi = xmax
-		#import warnings
-		#warnings.filterwarnings("ignore")
-
 		d['extend'] = {}
 		asymptote = [nsol,Tsol]	# this is already normalized
 		norm = [1e20, 1e3]	# normalize before profile fitting
 		
-		# If you want to keep all original points in the profile, but fill in the gaps
-		# divide intervals until number of grid points exceed threshold, given by suggested dx
-		# this assumes non-equidistant grid, as original profiles are likely equidistant in rho, not in psi
-		psi = d['psi'].copy()
-		Npsi = len(psi)		# this is the current number of grid points
-		
-		if Npsi < 100: 			# use equidistant temporary upscaling for smooth profile fits 
-			Nup = 101
-			upscale = True		# this is very important in making a better tanh curve fit 
-		else: upscale = False
-		
-		# this sets the output grid
-		if preservePoints:
-			Nmax = int(1.0/dx) + 1	# this is the threshold
-			while Npsi < Nmax:
-				Npsi = 2*Npsi - 1
-				x = np.zeros(Npsi)
-				x[0::2] = psi
-				x[1::2] = psi[0:-1] + 0.5*np.diff(psi)
-				psi = x
-			# now psi is on higher resolution, but still only [0,1], now extend to xmax
-			psiSol = np.arange(1+dx,xmax+dx,dx)
-			psi = np.append(psi,psiSol)
-			Npsi = len(psi)
-			print(Npsi,psi)
-		else: psi = None
-		
 		for i,key in enumerate(['ne','Te']):
-			#print(key)
-			if upscale:
-				f = scinter.PchipInterpolator(d['psi'], d[key]/norm[i])		# this gets overwritten by a smooth profile fit later
-				x = np.linspace(0,1,Nup)
-				y = f(x)
-			else: x,y = d['psi'], d[key]/norm[i]
-			x,y = expro.make_profile(x,y, key, asymptote = asymptote[i], show = True, xmin = xmin, xmax = xmax, dx = dx, xout = psi) # if psi is None, xout is ignored and final grid is np.arange(0,xmax+dx,dx)
+			x,y = expro.make_profile(d['psi'], d[key]/norm[i], key, asymptote = asymptote[i], show = False, xmin = xmin, xmax = xmax, dx = dx, preservePoints = preservePoints) 
 			d['extend'][key] = y*norm[i]
 		d['extend']['psi'] = x
 				
@@ -219,13 +183,7 @@ class JSON_IMAS:
 		for ion in d['ions']:
 			d['extend'][ion] = {}
 			for i,key in enumerate(['ni','Ti']):
-				#print(key)
-				if upscale:
-					f = scinter.PchipInterpolator(d['psi'], d[ion][key]/norm[i])	# this gets overwritten by a smooth profile fit
-					x = np.linspace(0,1,Nup)
-					y = f(x)
-				else: x,y = d['psi'], d[ion][key]/norm[i]
-				x,y = expro.make_profile(x,y, key, asymptote = asymptote[i], show = True, xmin = xmin, xmax = xmax, dx = dx, xout = psi)
+				x,y = expro.make_profile(d['psi'], d[ion][key]/norm[i], key, asymptote = asymptote[i], show = False, xmin = xmin, xmax = xmax, dx = dx, preservePoints = preservePoints)
 				d['extend'][ion][key] = y*norm[i]
 				
 		# pressure needs special consideration: 
@@ -383,10 +341,10 @@ class JSON_IMAS:
 			x = self.profiles['psi']
 			y = profiles['V']
 		elif what in ['ni','iondensity']:
-			ylabel = species + ',  n$_i$ [10$^{20}$/m$^{3}$]'
+			ylabel = species + ', n$_i$ [10$^{20}$/m$^{3}$]'
 			y = profiles[species]['ni']*1e-20
 		elif what in ['ti','Ti','iontemperature']:
-			ylabel = species + ",  T$_{i}$ [keV]"
+			ylabel = species + ", T$_{i}$ [keV]"
 			y = profiles[species]['Ti']*1e-3
 			
 	   
@@ -438,7 +396,7 @@ class JSON_IMAS:
 			ax4.set_ylim(bottom=0)
 			
 			ax5 = fig.add_subplot(324, aspect = 'auto')
-			ax5.set_ylabel(species + ',	 n$_i$ [10$^{20}$/m$^{3}$]')
+			ax5.set_ylabel(species + ', n$_i$ [10$^{20}$/m$^{3}$]')
 			y = profiles[species]['ni']*1e-20
 			ax5.set_xlim(0,x.max())
 			ax5.get_xaxis().set_ticklabels([])
@@ -449,7 +407,7 @@ class JSON_IMAS:
 			ax5.set_ylim(bottom=0)
 			
 			ax6 = fig.add_subplot(326, aspect = 'auto')
-			ax6.set_ylabel(species + ",	 T$_{i}$ [keV]")
+			ax6.set_ylabel(species + ", T$_{i}$ [keV]")
 			y = profiles[species]['Ti']*1e-3
 			ax6.set_xlim(0,x.max())
 			ax6.set_xlabel('$\\psi$')
@@ -517,9 +475,11 @@ class JSON_IMAS:
 		print('Wrote new gfile')
 
 
-	def writeProfiles(self, keys = None):
+	def writeProfiles(self, keys = None, tag = None):
 		if keys is None: keys = ['ne','Te','ni','Ti']
 		else: keys = list(keys)
+		if tag is None: tag = ''
+		else: tag = '_' + tag
 		
 		psi = self.profiles['extend']['psi']
 		ion = self.profiles['ions'][0]
@@ -528,7 +488,7 @@ class JSON_IMAS:
 			else: pro = self.profiles['extend'][key]
 			if 'n' in key: norm = 1e20
 			else: norm = 1e3
-			with open('profile_' + str.lower(key),'w') as f:
+			with open('profile' + tag + '_' + str.lower(key),'w') as f:
 				#f.write('# ' + key + ' profile in ' + units + ' \n')
 				#f.write('# psi          ' + key + ' [' + units + '] \n')
 				for i in range(len(psi)):
