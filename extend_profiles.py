@@ -5,7 +5,7 @@ import scipy.interpolate as scinter
 import Misc.optimize_profiles as op
 
 def make_profile(x, y, key, asymptote = None, save = False, show = True, 
-				xmin = 0, xmax = 1.2, dx = 0.005, xout = None,
+				xmin = 0, xmax = 1.2, dx = 0.005, xout = None, preservePoints = True,
 				matchpoint = None, dxfit = None, SOLdxfit = None):
 	"""
 	Take profile data x,y, extend it to psi = xmax using a tanh with given asymptotic value
@@ -20,7 +20,8 @@ def make_profile(x, y, key, asymptote = None, save = False, show = True,
 	  xmin = min psi for profile fit; the profile fit takes data only from x > xmin; For x < xmin splines are used.
 	  xmax = max psi for profile fit; this is the extrapolation limit
 	  dx = final resolution of profile
-	  xout = optional grid points for the final profile; if given, ignores dx; default is equidistant grid with dx
+	  xout = optional grid points for the final profile; if given, ignores dx; default is equidistant grid with dx (see also preservePoints)
+	  preservePoints = Bool, whether to preserve the original x grid points along the inter- and extrapolated profile, or to replace with a linspace grid
 	  matchpoint = psi where x < xmin spline and x > xmin fit are matched together. This can be different than xmin, default is xmin
 	  dxfit = number of grid points on the left and right of matchpoint to ignore, so that the match can be made smoother with splines, typically single digit
 	  SOLdxfit = extra number of grid points to ignore on top of dxfit on the psi > matchpoint side; typically 0
@@ -59,6 +60,41 @@ def make_profile(x, y, key, asymptote = None, save = False, show = True,
 	if SOLdxfit is None: SOLdxfit = 0
 	
 	rawdata = {'px':x, 'py':y, 'units':units, 'key':key}
+
+	# If you want to keep all original points in the profile, but fill in the gaps
+	# divide intervals until number of grid points exceed threshold, given by suggested dx
+	# this assumes non-equidistant grid, as original profiles are likely equidistant in rho, not in psi
+	psi = x.copy()
+	Npsi = len(psi)		# this is the current number of grid points
+	
+	if Npsi < 100: 			# use equidistant temporary upscaling for smooth profile fits 
+		Nup = 101
+		upscale = True		# this is very important in making a better tanh curve fit 
+	else: upscale = False
+	
+	# this sets the output grid
+	if xout is None: 
+		if preservePoints:
+			Nmax = int(1.0/dx) + 1	# this is the threshold
+			while Npsi < Nmax:
+				Npsi = 2*Npsi - 1
+				xout = np.zeros(Npsi)
+				xout[0::2] = psi
+				xout[1::2] = psi[0:-1] + 0.5*np.diff(psi)
+				psi = xout
+			# now psi is on higher resolution, but still only [0,1], now extend to xmax
+			psiSol = np.arange(1+dx,xmax+dx,dx)
+			psi = np.append(psi,psiSol)
+			Npsi = len(psi)
+			#print(Npsi,psi)
+		else: psi = np.arange(0,xmax+dx,dx)
+	else: psi = xout
+	
+	if upscale:
+		f = scinter.PchipInterpolator(x,y)		# this gets overwritten by a smooth profile fit later
+		x = np.linspace(x.min(),x.max(),Nup)
+		y = f(x)
+	
 	if xmin > 0:
 		# fit a profile within [xmin,xmax] using dx step size
 		idx = x > xmin
@@ -75,11 +111,11 @@ def make_profile(x, y, key, asymptote = None, save = False, show = True,
 		# spline the combined profile for a smooth curve everywhere
 		# uses the points xout if given, or a equidistant grid with dx otherwise
 		f = scinter.UnivariateSpline(x1, y1, s = 0)
-		if xout is None: psi = np.arange(0,xmax+dx,dx)
-		else: psi = xout
 		pro = f(psi)
 	else:	# fit the entire profile, This is usually not a good idea, as the core and edge won't both fit well with the same tanh; this will ignore xout
-		psi,pro,_ = fit_profile(x, y, asymptote, xlim = [0,xmax], dx = dx)
+		psi0,pro0,_ = fit_profile(x, y, asymptote, xlim = [0,xmax], dx = dx)
+		f = scinter.UnivariateSpline(psi0,pro0, s = 0)
+		pro = f(psi)
 		
 	if show: 
 		plotProfile(psi, pro, rawdata = rawdata)
