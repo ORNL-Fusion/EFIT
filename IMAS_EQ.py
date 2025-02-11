@@ -177,8 +177,13 @@ class JSON_IMAS:
 		d['extend']['psi'] = x
 				
 		f = scinter.UnivariateSpline(d['psi'], d['V'], s = 0)
-		d['extend']['Vpsi'] = d['extend']['psi'][d['extend']['psi'] <= 1]
-		d['extend']['V'] = f(d['extend']['Vpsi'])
+		d['extend']['psi1'] = d['extend']['psi'][d['extend']['psi'] <= 1]
+		d['extend']['V'] = f(d['extend']['psi1'])
+		
+		f = scinter.UnivariateSpline(d['psi'], d['rho'], s = 0)
+		d['extend']['rho'] = f(d['extend']['psi1'])	# rho is only interpolated and ends at separatrix
+		d['extend']['rho'][0] = 0	# make sure the end points are exact.
+		d['extend']['rho'][-1] = 1
 				
 		for ion in d['ions']:
 			d['extend'][ion] = {}
@@ -192,7 +197,7 @@ class JSON_IMAS:
 		# start with interpolate
 		# Use a monotonic interpolation!!!! However, this is not as smooth as a regular spline. The first derivatives are guaranteed to be continuous, but the second derivatives may jump
 		f = scinter.PchipInterpolator(d['psi'], d['p'])
-		d['extend']['p'] = f(d['extend']['Vpsi'])
+		d['extend']['p'] = f(d['extend']['psi1'])
 		
 		self.profiles = d
 		self.correct_ni(asymptote = nsol*norm[0])
@@ -212,7 +217,7 @@ class JSON_IMAS:
 		xmax = self.profiles['extend']['psi'].max()
 		idx = np.where(self.profiles['extend']['psi'] > xmax - 0.08)[0]
 		
-		psi_new = np.append(self.profiles['extend']['Vpsi'], self.profiles['extend']['psi'][idx])
+		psi_new = np.append(self.profiles['extend']['psi1'], self.profiles['extend']['psi'][idx])
 		p_new = np.append(self.profiles['extend']['p'],p[idx])
 		f = scinter.PchipInterpolator(psi_new,p_new)
 		p_ex = f(self.profiles['extend']['psi'])
@@ -390,7 +395,7 @@ class JSON_IMAS:
 			ax4.set_xlim(0,x.max())
 			ax4.get_xaxis().set_ticklabels([])
 			if extended: 
-				ax4.plot(profiles['Vpsi'], y, style, color = 'k', lw = 2)
+				ax4.plot(profiles['psi1'], y, style, color = 'k', lw = 2)
 				ax4.plot(self.profiles['psi'], self.profiles['V'], style, color = 'r', lw = 2)
 			else: ax4.plot(x, y, '-', color = c, lw = 2)
 			ax4.set_ylim(bottom=0)
