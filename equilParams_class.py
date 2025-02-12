@@ -237,8 +237,8 @@ class equilParams:
 	
 			print('Writing to path: ' + file)
 			with open(file, 'w') as f:
-				f.write('  EFIT	   xx/xx/xxxx	 #' + str(shot) + '	 ' + str(self.g['time']) + 'ms		')
-				f.write('	3 ' + str(self.g['NR']) + ' ' + str(self.g['NZ']) + '\n')
+				f.write("{:<51}".format('  EFIT  xx/xx/xxxx  #' + str(shot) + '  ' + str(self.g['time']) + 'ms'))	# this needs to be exactly 51 chars
+				f.write('3 ' + str(self.g['NR']) + ' ' + str(self.g['NZ']) + '\n')
 				f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.g['Xdim'], self.g['Zdim'], self.g['R0'], self.g['R1'], self.g['Zmid']))
 				f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.g['RmAxis'], self.g['ZmAxis'], self.g['psiAxis'], self.g['psiSep'], self.g['Bt0']))
 				f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.g['Ip'], 0, 0, 0, 0))
@@ -249,7 +249,7 @@ class equilParams:
 				self._write_array(self.g['Pprime'], f)
 				self._write_array(self.g['psiRZ'].flatten(), f)
 				self._write_array(self.g['qpsi'], f)
-				f.write(str(self.g['Nlcfs']) + ' ' + str(self.g['Nwall']) + '\n')
+				f.write(str(self.g['Nlcfs']).rjust(5) + str(self.g['Nwall']).rjust(5) + '\n')	# these need to be 5 char long numbers with leading spaces
 				self._write_array(self.g['lcfs'].flatten(), f)
 				self._write_array(self.g['wall'].flatten(), f)
 				f.write(str(KVTOR) + ' ' + format(RVTOR, ' .9E') + ' ' + str(NMASS) + '\n')

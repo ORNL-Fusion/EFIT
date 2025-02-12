@@ -459,8 +459,8 @@ class JSON_IMAS:
 
 		print('Writing to path: ' +file)
 		with open(file, 'w') as f:
-			f.write('  EFIT	   xx/xx/xxxx	 #' + str(shot) + '	 ' + str(time) + 'ms		')
-			f.write('	3 ' + str(self.eqd['nw']) + ' ' + str(self.eqd['nh']) + '\n')
+			f.write("{:<51}".format('  EFIT  xx/xx/xxxx  #' + str(shot) + '  ' + str(time) + 'ms'))	# this needs to be exactly 51 chars
+			f.write('3 ' + str(self.eqd['nw']) + ' ' + str(self.eqd['nh']) + '\n')
 			f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.eqd['rdim'], self.eqd['zdim'], self.eqd['rcentr'], self.eqd['Rmin'], self.eqd['Zmid']))
 			f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.eqd['rmaxis'], self.eqd['zmaxis'], self.eqd['siAxis'], self.eqd['siBry'], self.eqd['bcentr']))
 			f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.eqd['Ip'], 0, 0, 0, 0))
@@ -471,7 +471,7 @@ class JSON_IMAS:
 			self._write_array(self.eqd['pprime'], f)
 			self._write_array(self.eqd['psirz'].flatten(), f)
 			self._write_array(self.eqd['qpsi'], f)
-			f.write(str(len(self.eqd['lcfs'])) + ' ' + str(len(self.eqd['wall'])) + '\n')
+			f.write(str(len(self.eqd['lcfs'])).rjust(5) + str(len(self.eqd['wall'])).rjust(5) + '\n')	# these need to be 5 char long numbers with leading spaces
 			self._write_array(self.eqd['lcfs'].flatten(), f)
 			self._write_array(self.eqd['wall'].flatten(), f)
 			f.write(str(KVTOR) + ' ' + format(RVTOR, ' .9E') + ' ' + str(NMASS) + '\n')
