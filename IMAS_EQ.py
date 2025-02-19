@@ -7,6 +7,8 @@ import os
 import numpy as np
 import scipy.interpolate as scinter
 
+from . import extend_profiles as expro
+
 class netCDF_IMAS:
 	def __init__(self):
 		"""
@@ -43,6 +45,7 @@ class JSON_IMAS:
 		import json
 		
 		self.eqd = None
+		self.psiN = None
 		self.profiles = None
 		self.shot = None
 		self.time = None
@@ -124,10 +127,13 @@ class JSON_IMAS:
 		d['thetapnts'] = 2*d['nw']
 		d['Rsminor'] = np.linspace(d['rmaxis'], d['Rbdry'], d['nw'])
 		self.eqd = d
+		self.psiN = psiN
 		return d
 	
 	
-	def coreProfiles(self, time, dx = 0.005, xmin = 0.7, xmax = 1.2, nsol = 0.02, Tsol = 1e-4, preservePoints = True):
+	def coreProfiles(self, time, dx = 0.005, xmin = 0.7, xmax = 1.2, nsol = 0.02, Tsol = 1e-4, 
+						preservePoints = True, extendForM3DC1 = False, correctionMargin = None, 
+						usePressureFromEQDSK = True, interlace = True):
 		"""
 		Sets the time slice and gets the profiles form the JSON
 		Sets the member variable self.profiles, a dictionary with keys: ['time', 'ne', 'Te', 'p', 'V', 'rho', 'psi', 'ions', 'D', 'extend']
@@ -140,9 +146,12 @@ class JSON_IMAS:
 	  	xmax = max psi for profile fit; this is the extrapolation limit
 	  	nsol = asymptotic value of SOL density for psi -> inf
 	  	Tsol = asymptotic value of SOL temperature for psi -> inf
-		""" 
-		from . import extend_profiles as expro
-
+	  	preservePoints = Keep original psi grid points, otherwise replace with a linspace, default is True
+	  	extendForM3DC1 = Assume ni = ne, adjust Te instead of ni and set preservePoints = False
+	  	correctionMargin = value < 1, but close to 1, default is 0.99, to multiply sum(n*T) so that sum(n*T) < p even for interpolated values.
+	  	usePressureFromEQDSK = Use pressure profile from the actual geqdsk in self.eqd instead of the pressure profile in data['core_profiles']
+	  	interlace = try to combine pressure profiles in eqd and core_profiles. This is not likely to work, so check the figure and use interactive response to decide.
+		""" 		
 		Ntimes = len(self.data['core_profiles']['profiles_1d'])
 		times = [self.data['core_profiles']['profiles_1d'][i]['time'] for i in range(Ntimes)]	   
 		try:
@@ -150,88 +159,166 @@ class JSON_IMAS:
 		except:
 			print("Could not find timestep " + str(time) + " in JSON equilibrium dict.	Aborting.")
 			return
+			
+		if self.eqd is None: _ = self.getEQ(time)
 		
 		profiles = self.data['core_profiles']['profiles_1d'][tIdx]
 		psiAxis = profiles['grid']['psi'][0]
 		psiSep = profiles['grid']['psi'][-1]
 		psiN = (np.array(profiles['grid']['psi']) - psiAxis)/(psiSep - psiAxis)
-		d = {'time':profiles['time'], 
+		self.profiles = {'time':profiles['time'], 
 			'ne':np.array(profiles['electrons']['density']), 'Te':np.array(profiles['electrons']['temperature']), 
 			'p':np.array(profiles['pressure_thermal']), 'V':np.array(profiles['grid']['volume']), 
-			'rho':np.array(profiles['grid']['rho_tor_norm']), 'psi':psiN} 
+			'rho':np.array(profiles['grid']['rho_tor_norm']), 'psi':psiN, 'psiPres':psiN} 
 			
 		ions = [profiles['ion'][item]['label'] for item in range(len(profiles['ion']))]
-		d['ions'] = ions
+		self.profiles['ions'] = ions
 		for i,ion in enumerate(ions):
-			d[ion] = {'ni':np.array(profiles['ion'][i]['density']), 'Ti':np.array(profiles['ion'][i]['temperature'])}
-		
-		
+			self.profiles[ion] = {'ni':np.array(profiles['ion'][i]['density']), 'Ti':np.array(profiles['ion'][i]['temperature'])}
+				
 		# Interpolate profiles to resolution dx, and extrapolate n,T profiles to psi = xmax
-		d['extend'] = {}
+		if extendForM3DC1: preservePoints = False
+		else: usePressureFromEQDSK = False
+		self.profiles['extend'] = {}
 		asymptote = [nsol,Tsol]	# this is already normalized
 		norm = [1e20, 1e3]	# normalize before profile fitting
 		
 		for i,key in enumerate(['ne','Te']):
-			x,y = expro.make_profile(d['psi'], d[key]/norm[i], key, asymptote = asymptote[i], show = False, xmin = xmin, xmax = xmax, dx = dx, preservePoints = preservePoints) 
-			d['extend'][key] = y*norm[i]
-		d['extend']['psi'] = x
+			x,y = expro.make_profile(self.profiles['psi'], self.profiles[key]/norm[i], key, asymptote = asymptote[i], show = False, xmin = xmin, xmax = xmax, dx = dx, preservePoints = preservePoints) 
+			self.profiles['extend'][key] = y*norm[i]
+		self.profiles['extend']['psi'] = x
 				
-		f = scinter.UnivariateSpline(d['psi'], d['V'], s = 0)
-		d['extend']['psi1'] = d['extend']['psi'][d['extend']['psi'] <= 1]
-		d['extend']['V'] = f(d['extend']['psi1'])
+		f = scinter.UnivariateSpline(self.profiles['psi'], self.profiles['V'], s = 0)
+		self.profiles['extend']['psi1'] = self.profiles['extend']['psi'][self.profiles['extend']['psi'] <= 1]
+		self.profiles['extend']['V'] = f(self.profiles['extend']['psi1'])
 		
-		f = scinter.UnivariateSpline(d['psi'], d['rho'], s = 0)
-		d['extend']['rho'] = f(d['extend']['psi1'])	# rho is only interpolated and ends at separatrix
-		d['extend']['rho'][0] = 0	# make sure the end points are exact.
-		d['extend']['rho'][-1] = 1
+		f = scinter.UnivariateSpline(self.profiles['psi'], self.profiles['rho'], s = 0)
+		self.profiles['extend']['rho'] = f(self.profiles['extend']['psi1'])	# rho is only interpolated and ends at separatrix
+		self.profiles['extend']['rho'][0] = 0	# make sure the end points are exact.
+		self.profiles['extend']['rho'][-1] = 1
 				
-		for ion in d['ions']:
-			d['extend'][ion] = {}
+		for ion in self.profiles['ions']:
+			self.profiles['extend'][ion] = {}
 			for i,key in enumerate(['ni','Ti']):
-				x,y = expro.make_profile(d['psi'], d[ion][key]/norm[i], key, asymptote = asymptote[i], show = False, xmin = xmin, xmax = xmax, dx = dx, preservePoints = preservePoints)
-				d['extend'][ion][key] = y*norm[i]
-				
+				x,y = expro.make_profile(self.profiles['psi'], self.profiles[ion][key]/norm[i], key, asymptote = asymptote[i], show = False, xmin = xmin, xmax = xmax, dx = dx, preservePoints = preservePoints)
+				self.profiles['extend'][ion][key] = y*norm[i]
+						
 		# pressure needs special consideration: 
 		# it needs to be splined for psi <= 1; do NOT use profile fit; it does not preserve original points, but makes a least square fit
 		# on the other hand the extrapolation for psi > 1 needs to be monotonic and tanh asymptotic; regular cubic splines cannot do that
 		# start with interpolate
 		# Use a monotonic interpolation!!!! However, this is not as smooth as a regular spline. The first derivatives are guaranteed to be continuous, but the second derivatives may jump
-		f = scinter.PchipInterpolator(d['psi'], d['p'])
-		d['extend']['p'] = f(d['extend']['psi1'])
+		if usePressureFromEQDSK:
+			chk = -1
+			if interlace:
+				chk = self.interlacePressure(self.profiles['psi'], self.profiles['p'], self.psiN, self.eqd['pres'])
+			if chk == -1:
+				self.profiles['psiPres'], self.profiles['p'] = self.psiN, self.eqd['pres']
+			f = scinter.PchipInterpolator(self.profiles['psiPres'], self.profiles['p'])
+			self.profiles['extend']['p'] = f(self.profiles['extend']['psi1'])
+		else:
+			f = scinter.PchipInterpolator(self.profiles['psi'], self.profiles['p'])
+			self.profiles['extend']['p'] = f(self.profiles['extend']['psi1'])
 		
-		self.profiles = d
-		self.correct_ni(asymptote = nsol*norm[0])
+		if extendForM3DC1: self.correct_ne(asymptote = nsol*norm[0], correctionMargin = correctionMargin)
+		else: self.correct_ni(asymptote = nsol*norm[0], correctionMargin = correctionMargin)	# here usePressureFromEQDSK = False
 		self.extendPressure()
 		return
+
+
+	def interlacePressure(self, psiProf, pProf, psiEQD, pEQD):
+		"""
+		If the pressure profiles in EQD and Profiles have different knots, but 'visually' match, then interlace them to increase overall resolution
+		"""
+		if len(psiProf) == len(psiEQD):
+			if np.abs(psiProf - psiEQD).max() < 1e-6:
+				print('Pressure profile knots are identical, no interlacing possible')
+				return -1
+				
+		import matplotlib.pyplot as plt
+		fig = plt.figure()
+		plt.plot(psiProf, pProf*1e-3, 'ko-', lw = 2, label = 'Profiles pressure')
+		plt.plot(psiEQD, pEQD*1e-3, 'bo-', lw = 2, label = 'EQD pressure')
+		plt.xlim(0,1)
+		plt.xlabel('$\\psi$')
+		plt.ylabel('p$ [kPa]')
+		plt.legend()
+		
+		x = np.linspace(0,1,300)
+		fProf = scinter.PchipInterpolator(psiProf, pProf)
+		fEQD = scinter.PchipInterpolator(psiEQD, pEQD)
+		
+		if np.abs(fProf(x) - fEQD(x)).max() < 1e-6:	
+			print('Profiles similar. Attempting interlace')
+		else:
+			plt.plot(x, (fProf(x) - fEQD(x))*1e-3, 'r-', lw = 2, label = 'difference')
+			plt.legend()
+			print('Profiles appear different. Verify with plot if interlacing should be done.')
+			answer = input("Proceed (y/n)?: ")
+			if answer in ['n', 'no', 'No', 'N', 'False', 'false']:
+				plt.close(fig) 
+				return -1
+		
+		psiAll = np.append(psiProf,psiEQD)
+		psiOrder = np.argsort(psiAll)
+		psiAll = psiAll[psiOrder]
+		pAll = np.append(pProf,pEQD)[psiOrder]
+		d = np.abs(np.diff(psiAll))
+		idx = np.where(d < 1e-12)[0]
+		psiAll = np.delete(psiAll,idx)
+		pAll = np.delete(pAll,idx)
+		
+		plt.plot(psiAll, pAll*1e-3, 'g-', lw = 2, label = 'Combined pressure')
+		plt.legend()
+		self.profiles['psiPres'], self.profiles['p'] = psiAll, pAll
+		return 0
+		
+
+	def correct_ne(self, asymptote = 0, correctionMargin = None):
+		"""		
+		Correct ne, so that p - sum(n*T) >= 0 for all points in p = self.profiles['p']
+		This ignores the original ni profile and assumes ni = ne, as required in M3D-C1, also ignore any impurities
+		Then extrapolate ne using exponential decay and interpolate ne on extended psi grid
+		"""
+		fne = scinter.UnivariateSpline(self.profiles['psi'],self.profiles['ne'],s = 0)	# remap ne if usePressureFromEQDSK, else this does nothing
+		ion = self.profiles['ions'][0]
+		psiEx, Te, Ti = self.profiles['extend']['psi'], self.profiles['extend']['Te'], self.profiles['extend'][ion]['Ti']
+		psi0, p0, ne = self.profiles['psiPres'], self.profiles['p'], fne(self.profiles['psiPres'])
+		neNew = expro.correct_ne(psi0, p0, ne, psiEx, Te, Ti, asymptote = asymptote, correctionMargin = correctionMargin)
+		self.profiles['extend']['ne'] = neNew
+		self.profiles['extend'][ion]['ni'] = self.profiles['extend']['ne'].copy()
 
 
 	def extendPressure(self):
 		"""
 		Extend the pressure using sum(n*T) for psi > 1
 		"""
-		e = 1.60217663e-19
-		p = self.profiles['extend']['ne'] * self.profiles['extend']['Te']*e
-		for ion in self.profiles['ions']:
-			p += self.profiles['extend'][ion]['ni'] * self.profiles['extend'][ion]['Ti']*e
+		ion = self.profiles['ions'][0]
+		psiEx, ne, Te = self.profiles['extend']['psi'], self.profiles['extend']['ne'], self.profiles['extend']['Te']
+		ni, Ti = self.profiles['extend'][ion]['ni'], self.profiles['extend'][ion]['Ti']
+		psi0, p0 = self.profiles['extend']['psi1'], self.profiles['extend']['p']	# here on psi1 grid only
+		pEx = expro.extendPressure(psiEx, ne, Te, ni, Ti, psi0, p0)
+		self.profiles['extend']['p'] = pEx	# now on psiEx grid
 
-		xmax = self.profiles['extend']['psi'].max()
-		idx = np.where(self.profiles['extend']['psi'] > xmax - 0.08)[0]
-		
-		psi_new = np.append(self.profiles['extend']['psi1'], self.profiles['extend']['psi'][idx])
-		p_new = np.append(self.profiles['extend']['p'],p[idx])
-		f = scinter.PchipInterpolator(psi_new,p_new)
-		p_ex = f(self.profiles['extend']['psi'])
-		self.profiles['extend']['p'] = p_ex
-		self.checkExtension()
-		return #p,psi_new,p_new
-		
 
-	def correct_ni(self, asymptote = 0):
+	def checkExtension(self):
+		"""
+		#Verify that p - sum(n*T) >= 0
+		#Using the extended psi grid and original grid
+		"""
+		ion = self.profiles['ions'][0]
+		psiEx, ne, Te = self.profiles['extend']['psi'], self.profiles['extend']['ne'], self.profiles['extend']['Te']
+		ni, Ti, pEx = self.profiles['extend'][ion]['ni'], self.profiles['extend'][ion]['Ti'], self.profiles['extend']['p']
+		expro.checkExtension(psiEx, ne, Te, ni, Ti, pEx)
+
+
+	def correct_ni(self, asymptote = 0, correctionMargin = None):
 		"""		
 		Correct main ion ni, so that p - sum(n*T) >= 0 for all points in p = self.profiles['p']
 		Then extrapolate ni using exponential decay and interpolate ni on extended psi grid
 		"""
 		e = 1.60217663e-19
+		if correctionMargin is None: correctionMargin = 0.99
 		
 		# Spline ne,te and ti for the original psi
 		fne = scinter.UnivariateSpline(self.profiles['extend']['psi'], self.profiles['extend']['ne'], s = 0)
@@ -260,7 +347,7 @@ class JSON_IMAS:
 		# where d < 0 replace ni with new value so that  p - sum(n*T) >= 0 -> ni patched
 		ni0 = (self.profiles['p'] - netex - impx) / tix		# this ni would make d = 0 everywhere
 		niPatched = self.profiles[ion]['ni'].copy()
-		niPatched[idx] = ni0[idx]*0.999	# give it a tiny margin
+		niPatched[idx] = ni0[idx] * correctionMargin	# give it a tiny margin
 		
 		# Use a monotonic interpolation for ni_patched -> upscale ni to extended psi grid
 		# !!!!!!! This interpolator does not overshoot like UnivariateSpline, but instead maintains a monotonic curve !!!!!!!!!!!!
@@ -297,24 +384,6 @@ class JSON_IMAS:
 		return #x,p,d,ni0,niPatched,niNew,p2,d2
 		
 		
-	def checkExtension(self):
-		"""
-		Verify that p - sum(n*T) >= 0
-		Using the extended psi grid
-		"""
-		e = 1.60217663e-19
-		p = self.profiles['extend']['ne'] * self.profiles['extend']['Te']*e
-		for ion in self.profiles['ions']:
-			p += self.profiles['extend'][ion]['ni'] * self.profiles['extend'][ion]['Ti']*e
-
-		#idx = np.where(self.profiles['extend']['psi'] <= 1)[0]
-		d = self.profiles['extend']['p'] - p
-		
-		if any(d < 0): print('Sum of n*T exceeds thermal pressure inside the separatrix. Check extended profiles.')
-		else: print('Extension okay')
-		return #p,d
-		
-	
 	def plotProfile(self, what = 'all', fig = None, c = None, label = '', extended = False, style = None):
 		"""
 		what: keyword of what profile to plot. default is 'all' and plots all 6 relevant profiles
@@ -363,7 +432,7 @@ class JSON_IMAS:
 			ax1.get_xaxis().set_ticklabels([])
 			if extended: 
 				ax1.plot(x, y, style, color = 'k', lw = 2)
-				ax1.plot(self.profiles['psi'], self.profiles['p']*1e-3, style, color = 'r', lw = 2)
+				ax1.plot(self.profiles['psiPres'], self.profiles['p']*1e-3, style, color = 'r', lw = 2)
 			else: ax1.plot(x, y, '-', color = c, lw = 2)
 			ax1.set_ylim(bottom=0)
 			
@@ -435,7 +504,25 @@ class JSON_IMAS:
 			if len(label) > 0: plt.legend()
 			
 		fig.tight_layout()
+
 	   
+	def writeProfiles(self, keys = None, tag = None):
+		"""
+		Write all profiles to files
+		keys = list of profiles, if keys is None: keys = ['ne','Te','ni','Ti']
+		tag  = optional string to add to output file name
+		"""
+		if keys is None: keys = ['ne','Te','ni','Ti']
+		else: keys = list(keys)
+		psi = self.profiles['extend']['psi']
+		ion = self.profiles['ions'][0]
+		for key in keys:
+			if 'i' in key: pro = self.profiles['extend'][ion][key]
+			else: pro = self.profiles['extend'][key]
+			if 'n' in key: norm = 1e20
+			else: norm = 1e3
+			expro.writeProfile(psi, pro, key, tag = tag, norm = norm)
+
 	
 	def writeGEQDSK(self, file, shot = None, time = None):
 		"""
@@ -478,28 +565,6 @@ class JSON_IMAS:
 			self._write_array(RHOVN, f)
 
 		print('Wrote new gfile')
-
-
-	def writeProfiles(self, keys = None, tag = None):
-		if keys is None: keys = ['ne','Te','ni','Ti']
-		else: keys = list(keys)
-		if tag is None: tag = ''
-		else: tag = '_' + tag
-		
-		psi = self.profiles['extend']['psi']
-		ion = self.profiles['ions'][0]
-		for key in keys:
-			if 'i' in key: pro = self.profiles['extend'][ion][key]
-			else: pro = self.profiles['extend'][key]
-			if 'n' in key: norm = 1e20
-			else: norm = 1e3
-			with open('profile' + tag + '_' + str.lower(key),'w') as f:
-				#f.write('# ' + key + ' profile in ' + units + ' \n')
-				#f.write('# psi          ' + key + ' [' + units + '] \n')
-				for i in range(len(psi)):
-					f.write(format(psi[i],' 13.7e') + ' \t' + format(pro[i]/norm,' 13.7e') + '\n')
-
-
 
 
 	#=====================================================================
