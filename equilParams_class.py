@@ -15,8 +15,10 @@ import scipy.interpolate as interp
 import warnings
 
 from . import geqdsk as gdsk	# this is a relative import
-from . import IMAS_EQ	# this is a relative import
 from . import equilibrium as eq
+
+try: from . import IMAS_EQ	# this is a relative import
+except: pass	# if not found skip this import; then only geqdsk functionality available
 
 class equilParams:
 
