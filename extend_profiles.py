@@ -2,7 +2,7 @@ import sys,os
 import numpy as np
 import scipy.interpolate as scinter
 
-import Misc.optimize_profiles as op
+import EFIT.optimize_profiles as op
 
 def make_profile(x, y, key, asymptote = None, save = False, show = True, 
 				xmin = 0, xmax = 1.2, dx = 0.005, xout = None, preservePoints = True,
