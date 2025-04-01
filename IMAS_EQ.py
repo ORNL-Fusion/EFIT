@@ -112,6 +112,7 @@ class JSON_IMAS:
 
 		#2D profiles
 		d['psirz'] = np.array(eqt['profiles_2d'][0]['psi']).T * psiMult
+		if d['psirz'].shape[0] != d['nh']: d['psirz'] = d['psirz'].T
 		
 		d['lcfs'] = np.vstack((d['Rlcfs'], d['Zlcfs'])).T
 		d['Rwall'] = np.array(wall['description_2d'][0]['limiter']['unit'][0]['outline']['r'])
@@ -174,7 +175,8 @@ class JSON_IMAS:
 		ions = [profiles['ion'][item]['label'] for item in range(len(profiles['ion']))]
 		self.profiles['ions'] = ions
 		for i,ion in enumerate(ions):
-			self.profiles[ion] = {'ni':np.array(profiles['ion'][i]['density']), 'Ti':np.array(profiles['ion'][i]['temperature'])}
+			self.profiles[ion] = {'ni':np.array(profiles['ion'][i]['density'])}
+			if 'temperature' in profiles['ion'][i]: self.profiles[ion]['Ti'] = np.array(profiles['ion'][i]['temperature'])
 				
 		# Interpolate profiles to resolution dx, and extrapolate n,T profiles to psi = xmax
 		if extendForM3DC1: preservePoints = False
@@ -200,8 +202,10 @@ class JSON_IMAS:
 		for ion in self.profiles['ions']:
 			self.profiles['extend'][ion] = {}
 			for i,key in enumerate(['ni','Ti']):
-				x,y = expro.make_profile(self.profiles['psi'], self.profiles[ion][key]/norm[i], key, asymptote = asymptote[i], show = False, xmin = xmin, xmax = xmax, dx = dx, preservePoints = preservePoints)
-				self.profiles['extend'][ion][key] = y*norm[i]
+				if key in self.profiles[ion]:
+					try: x,y = expro.make_profile(self.profiles['psi'], self.profiles[ion][key]/norm[i], key, asymptote = asymptote[i], show = False, xmin = xmin, xmax = xmax, dx = dx, preservePoints = preservePoints)
+					except: y = np.zeros(self.profiles['extend']['psi'].shape)
+					self.profiles['extend'][ion][key] = y*norm[i]
 						
 		# pressure needs special consideration: 
 		# it needs to be splined for psi <= 1; do NOT use profile fit; it does not preserve original points, but makes a least square fit
@@ -217,6 +221,7 @@ class JSON_IMAS:
 			f = scinter.PchipInterpolator(self.profiles['psiPres'], self.profiles['p'])
 			self.profiles['extend']['p'] = f(self.profiles['extend']['psi1'])
 		else:
+			self.profiles['psiPres'] = self.profiles['psi']
 			f = scinter.PchipInterpolator(self.profiles['psi'], self.profiles['p'])
 			self.profiles['extend']['p'] = f(self.profiles['extend']['psi1'])
 		
@@ -225,6 +230,47 @@ class JSON_IMAS:
 		self.extendPressure()
 		return
 
+
+	def sanityCheck(self, time, m3dc1 = True):
+		import matplotlib.pyplot as plt
+		e = 1.60217663e-19
+		Ntimes = len(self.data['core_profiles']['profiles_1d'])
+		times = [self.data['core_profiles']['profiles_1d'][i]['time'] for i in range(Ntimes)]	   
+		try:
+			tIdx = np.where(np.round(np.array(times),8) == time)[0][0]
+		except:
+			print("Could not find timestep " + str(time) + " in JSON equilibrium dict.	Aborting.")
+			return
+			
+		if self.eqd is None: _ = self.getEQ(time)
+		
+		profiles = self.data['core_profiles']['profiles_1d'][tIdx]
+		psiAxis = profiles['grid']['psi'][0]
+		psiSep = profiles['grid']['psi'][-1]
+		psiN = (np.array(profiles['grid']['psi']) - psiAxis)/(psiSep - psiAxis)		
+		
+		psieq, peq = self.psiN, self.eqd['pres']
+		pth = np.array(profiles['pressure_thermal'])
+		ne = np.array(profiles['electrons']['density'])
+		Te = np.array(profiles['electrons']['temperature'])
+		ni = np.array(profiles['ion'][0]['density'])
+		Ti = np.array(profiles['ion'][0]['temperature'])
+		
+		if m3dc1:
+			psum = ne*(Te + Ti)*e
+		else:
+			psum = ne*Te*e + ni*Ti*e
+		
+		plt.figure()
+		plt.plot(psieq, peq*1e-3, 'k-', lw = 2, label = 'geqdsk')
+		plt.plot(psiN, pth*1e-3, 'b-', lw = 2, label = 'thermal')
+		plt.plot(psiN, psum*1e-3, 'g-', lw = 2, label = 'ne*Te + ni*Ti')
+		plt.xlabel('$\\psi$')
+		plt.ylabel('pressure [kPa]')
+		plt.xlim(0,1)
+		plt.legend()
+		
+		
 
 	def interlacePressure(self, psiProf, pProf, psiEQD, pEQD):
 		"""
@@ -324,12 +370,16 @@ class JSON_IMAS:
 		fne = scinter.UnivariateSpline(self.profiles['extend']['psi'], self.profiles['extend']['ne'], s = 0)
 		fte = scinter.UnivariateSpline(self.profiles['extend']['psi'], self.profiles['extend']['Te'], s = 0)
 		ion = self.profiles['ions'][0]
+		ion0 = self.profiles['ions'][0]
 		fti = scinter.UnivariateSpline(self.profiles['extend']['psi'], self.profiles['extend'][ion]['Ti'], s = 0)
 		if len(self.profiles['ions']) > 1:
 			y = 0
 			for i in range(1,len(self.profiles['ions'])): 
 				ion = self.profiles['ions'][i]
-				y += self.profiles['extend'][ion]['ni'] * self.profiles['extend'][ion]['Ti']*e
+				if 'Ti' in self.profiles['extend'][ion]:
+					y += self.profiles['extend'][ion]['ni'] * self.profiles['extend'][ion]['Ti']*e
+				else:
+					y += self.profiles['extend'][ion]['ni'] * self.profiles['extend'][ion0]['Ti']*e
 			fnT_imp = scinter.UnivariateSpline(self.profiles['extend']['psi'], y, s = 0)
 		else: fnT_imp = lambda x: 0
 		
@@ -404,6 +454,7 @@ class JSON_IMAS:
 		if what in ['p','P','Pres','pres','pressure','Ptot','ptot','Press','press','Pressure']:
 			ylabel = 'p$_{th}$ [kPa]'
 			y = profiles['p']*1e-3
+			x = self.profiles['psiPres']
 		elif what in ['ne','density']:
 			ylabel = 'n$_e$ [10$^{20}$/m$^{3}$]'
 			y = profiles['ne']*1e-20
@@ -433,7 +484,7 @@ class JSON_IMAS:
 			if extended: 
 				ax1.plot(x, y, style, color = 'k', lw = 2)
 				ax1.plot(self.profiles['psiPres'], self.profiles['p']*1e-3, style, color = 'r', lw = 2)
-			else: ax1.plot(x, y, '-', color = c, lw = 2)
+			else: ax1.plot(self.profiles['psiPres'], y, '-', color = c, lw = 2)
 			ax1.set_ylim(bottom=0)
 			
 			ax2 = fig.add_subplot(323, aspect = 'auto')
