@@ -59,6 +59,7 @@ class equilParams:
 				print("JSON EQmode")
 				imas_js = IMAS_EQ.JSON_IMAS(filename)
 				self.data = imas_js.getEQ(time)
+				if self.data is None: return
 			else:
 				#print("GEQDSK EQmode")
 				GEQDSKflag = True
