@@ -166,7 +166,7 @@ def plotProfile(psi, pro, save  = False, tag = None, rawdata = None):
 	if save: plt.gcf().savefig(rawdata['key'] + 'Profile' + tag + '.eps', dpi = (300), bbox_inches = 'tight')
 
 
-def correct_ne(psi0, p, ne, psiEx, Te, Ti = None, asymptote = 0, correctionMargin = None):
+def correct_ne(psi0, p, ne, psiEx, Te, Ti = None, asymptote = 0, correctionMargin = None, correctionMarginCore = None):
 	"""		
 	Correct ne, so that p - sum(n*T) >= 0 for all points in p
 	This ignores any original ni profile and assumes ni = ne, as required in M3D-C1, also ignore any impurities
@@ -179,9 +179,16 @@ def correct_ne(psi0, p, ne, psiEx, Te, Ti = None, asymptote = 0, correctionMargi
 	Ti = optional ion temperature on extended psi grid, if None: Ti = p/ne - Te, but then force Ti >= Te.min() and continue correcting ne with this assumed Ti
 	asymptote = ne in far SOL
 	correctionMargin = value < 1, but close to 1, default is 0.99, to multiply sum(n*T) so that sum(n*T) < p even for interpolated values.
+	correctionMarginCore: same as above, but for the core. If this is used, a tanh transitions smoothly from this in the core to the one above in the edge
 	"""
 	e = 1.60217663e-19
 	if correctionMargin is None: correctionMargin = 0.99
+	if correctionMarginCore is None: correctionMarginCore = correctionMargin
+	x = np.linspace(0,1,100)
+	c = [0.7,0.2,correctionMarginCore,correctionMargin]	# c0 = SYMMETRY POINT, c1 = FULL WIDTH, c2 = HEIGHT, c3 = OFFSET
+	z = 2.*(c[0]-x)/c[1]
+	y = 0.5*(c[2]-c[3]) * (np.exp(z) - np.exp(-z))/(np.exp(z) + np.exp(-z)) + 0.5*(c[2]+c[3])
+	fCorrect = scinter.UnivariateSpline(x,y, s = 0, ext = 'const')
 	
 	# Spline te and ti for the original psi
 	fte = scinter.UnivariateSpline(psiEx, Te, s = 0)
@@ -207,7 +214,7 @@ def correct_ne(psi0, p, ne, psiEx, Te, Ti = None, asymptote = 0, correctionMargi
 	# where d < 0 replace ne with new value so that  p - sum(n*T) >= 0 -> ne patched
 	ne0 = p / (tex+tix)		# this ne would make d = 0 everywhere
 	nePatched = ne.copy()
-	nePatched[idx] = ne0[idx] * correctionMargin	# give it a tiny margin
+	nePatched[idx] = ne0[idx] * fCorrect(psi0[idx])	# give it a tiny margin
 	
 	# Use a monotonic interpolation for ni_patched -> upscale ni to extended psi grid
 	# !!!!!!! This interpolator does not overshoot like UnivariateSpline, but instead maintains a monotonic curve !!!!!!!!!!!!
@@ -222,6 +229,10 @@ def correct_ne(psi0, p, ne, psiEx, Te, Ti = None, asymptote = 0, correctionMargi
 	y1 = y[-1]
 	dx = psiCore[-1] - psiCore[-2]	# NOT equidistant
 	dy1 = (-y[-2] + y[-1])/dx		# 1st order only due to non-equidistant grid
+	
+	if dy1 >= 0: 
+		print('Exponential extension failed')
+		print(x1,y1,dx,dy1)
 	
 	# Fit exponential decay f(x) = a*exp(b*x) + c; c = asymptote is given as input
 	c = asymptote

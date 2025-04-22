@@ -134,11 +134,7 @@ class JSON_IMAS:
 			d['qpsi'] = np.interp(psiN, psiN_profile, d['qpsi'])
 			
 		if d['pres'][-1] <= 0: 
-			print('Problem: EFIT pressure at Separatrix is <= 0. Replacing last grid point with thermal pressure.')
-			Ntimestmp = len(self.data['core_profiles']['profiles_1d'])
-			timestmp = [self.data['core_profiles']['profiles_1d'][i]['time'] for i in range(Ntimestmp)]	   
-			tIdxtmp = np.where(np.round(np.array(timestmp),8) == time)[0][0]
-			d['pres'][-1] = self.data['core_profiles']['profiles_1d'][tIdxtmp]['pressure_thermal'][-1]
+			print('Problem: EFIT pressure at Separatrix is <= 0. This makes this EFIT unusable for M3DC1')
 		
 		#2D profiles
 		d['psirz'] = np.array(eqt['profiles_2d'][0]['psi']).T * psiMult
@@ -166,8 +162,8 @@ class JSON_IMAS:
 	
 	
 	def coreProfiles(self, time, dx = 0.005, xmin = 0.7, xmax = 1.2, nsol = 0.02, Tsol = 1e-4, 
-						preservePoints = True, extendForM3DC1 = False, correctionMargin = None, 
-						usePressureFromEQDSK = True, interlace = False):
+						preservePoints = True, extendForM3DC1 = False, correctionMargin = None, correctionMarginCore = None, 
+						usePressureFromEQDSK = True, doNotExtend = False):
 		"""
 		Sets the time slice and gets the profiles form the JSON
 		Sets the member variable self.profiles, a dictionary with keys: ['time', 'ne', 'Te', 'p', 'V', 'rho', 'psi', 'ions', 'D', 'extend']
@@ -183,8 +179,9 @@ class JSON_IMAS:
 	  	preservePoints = Keep original psi grid points, otherwise replace with a linspace, default is True
 	  	extendForM3DC1 = Assume ni = ne, adjust Te instead of ni and set preservePoints = False
 	  	correctionMargin = value < 1, but close to 1, default is 0.99, to multiply sum(n*T) so that sum(n*T) < p even for interpolated values.
+	  	correctionMarginCore: same as above, but for the core. If this is used, a tanh transitions smoothly from this in the core to the one above in the edge
 	  	usePressureFromEQDSK = Use pressure profile from the actual geqdsk in self.eqd instead of the pressure profile in data['core_profiles']
-	  	interlace = try to combine pressure profiles in eqd and core_profiles. This is not likely to work, so check the figure and use interactive response to decide.
+	  	doNotExtend = Skip the profile extension. This is for a quick check on the profiles, if the extension fails.
 		""" 		
 		Ntimes = len(self.data['core_profiles']['profiles_1d'])
 		times = [self.data['core_profiles']['profiles_1d'][i]['time'] for i in range(Ntimes)]	   
@@ -226,6 +223,7 @@ class JSON_IMAS:
 				self.profiles[ion]['Ti'] = np.array(profiles['ion'][i]['temperature'])
 				if np.log10(self.profiles[ion]['Ti'][0]) < 2: self.profiles[ion]['Ti'] *= 1e3		# Ti was in keV, now in eV
 
+		if doNotExtend: return
 				
 		# Interpolate profiles to resolution dx, and extrapolate n,T profiles to psi = xmax
 		if extendForM3DC1: preservePoints = False
@@ -253,7 +251,9 @@ class JSON_IMAS:
 			for i,key in enumerate(['ni','Ti']):
 				if key in self.profiles[ion]:
 					try: x,y = expro.make_profile(self.profiles['psi'], self.profiles[ion][key]/norm[i], key, asymptote = asymptote[i], show = False, xmin = xmin, xmax = xmax, dx = dx, preservePoints = preservePoints)
-					except: y = np.zeros(self.profiles['extend']['psi'].shape)
+					except: 
+						y = np.zeros(self.profiles['extend']['psi'].shape)
+						print('Extension failed for profile ' + key + 'for ion species: ' + ion)
 					self.profiles['extend'][ion][key] = y*norm[i]
 						
 		# pressure needs special consideration: 
@@ -261,20 +261,11 @@ class JSON_IMAS:
 		# on the other hand the extrapolation for psi > 1 needs to be monotonic and tanh asymptotic; regular cubic splines cannot do that
 		# start with interpolate
 		# Use a monotonic interpolation!!!! However, this is not as smooth as a regular spline. The first derivatives are guaranteed to be continuous, but the second derivatives may jump
-		if usePressureFromEQDSK:
-			chk = -1
-			if interlace:
-				chk = self.interlacePressure(self.profiles['psi'], self.profiles['p'], self.psiN, self.eqd['pres'])
-			if chk == -1:
-				self.profiles['psiPres'], self.profiles['p'] = self.psiN, self.eqd['pres']
-			f = scinter.PchipInterpolator(self.profiles['psiPres'], self.profiles['p'])
-			self.profiles['extend']['p'] = f(self.profiles['extend']['psi1'])
-		else:
-			self.profiles['psiPres'] = self.profiles['psi']
-			f = scinter.PchipInterpolator(self.profiles['psi'], self.profiles['p'])
-			self.profiles['extend']['p'] = f(self.profiles['extend']['psi1'])
+		self.profiles['psiPres'] = self.profiles['psi']
+		f = scinter.PchipInterpolator(self.profiles['psi'], self.profiles['p'])
+		self.profiles['extend']['p'] = f(self.profiles['extend']['psi1'])
 		
-		if extendForM3DC1: self.correct_ne(asymptote = nsol*norm[0], correctionMargin = correctionMargin)
+		if extendForM3DC1: self.correct_ne(asymptote = nsol*norm[0], correctionMargin = correctionMargin, correctionMarginCore = correctionMarginCore)
 		else: self.correct_ni(asymptote = nsol*norm[0], correctionMargin = correctionMargin)	# here usePressureFromEQDSK = False
 		self.extendPressure()
 		return
@@ -288,13 +279,19 @@ class JSON_IMAS:
 		times = [self.data['core_profiles']['profiles_1d'][i]['time'] for i in range(Ntimes)]	   
 		try:
 			tIdx = np.where(np.round(np.array(times),8) == time)[0][0]
+			tIdxeqd = np.where(np.round(np.array(self.data['equilibrium']['time']),8) == time)[0][0]
 		except:
 			print("Could not find timestep " + str(time) + " in JSON equilibrium dict.	Aborting.")
 			return
 			
-		if self.eqd is None: _ = self.getEQ(time)
+		try: 
+			if self.eqd is None: _ = self.getEQ(time)
+		except: 
+			print('getEQ failed!')
 		
 		profiles = self.data['core_profiles']['profiles_1d'][tIdx]
+		eqt = self.data['equilibrium']['time_slice'][tIdxeqd]
+		
 		if 'rho_pol_norm' in profiles['grid']: psiN = np.array(profiles['grid']['rho_pol_norm'])**2		# rho = sqrt(flux), so flux  = rho**2
 		elif 'psi' in profiles['grid']:
 			psiAxis = profiles['grid']['psi'][0]
@@ -308,24 +305,37 @@ class JSON_IMAS:
 				return
 		if psiN[-1] != 1: print('Problem: Profiles psi grid is wrong')
 		
-		psieq, peq = self.psiN, self.eqd['pres']
-		if peq[-1] <= 0: print('Problem: EFIT pressure at Separatrix is <= 0')
+		psieq, peq = np.array(eqt['profiles_1d']['psi_norm']), np.array(eqt['profiles_1d']['pressure'])
+		if np.any(peq <= 0): print('Problem: EFIT pressure <= 0 somewhere')
 		if psieq[-1] != 1: print('Problem: EFIT psi grid is wrong')
 
 		try: 
 			pth = np.array(profiles['pressure_thermal'])
-			if pth[-1] <= 0: print('Problem: pth at Separatrix is <= 0')
+			if np.any(pth <= 0): print('Problem: pth <= 0 somewhere')
 		except:
 			print('thermal pressure not found')
 			pth = np.zeros(psiN.shape)
 		ne = np.array(profiles['electrons']['density'])
-		if ne[-1] <= 0: print('Problem: ne at Separatrix is <= 0')
+		if np.any(ne <= 0): print('Problem: ne <= 0 somewhere')
 		Te = np.array(profiles['electrons']['temperature'])
-		if Te[-1] <= 0: print('Problem: Te at Separatrix is <= 0')
-		ni = np.array(profiles['ion'][0]['density'])
-		if ni[-1] <= 0: print('Problem: ni at Separatrix is <= 0')
-		Ti = np.array(profiles['ion'][0]['temperature'])
-		if Ti[-1] <= 0: print('Problem: Ti at Separatrix is <= 0')
+		if np.any(Te <= 0): print('Problem: Te <= 0 somewhere')
+		
+		foundIt = False
+		ions = [profiles['ion'][item]['label'] for item in range(len(profiles['ion']))]
+		for idx, ion in enumerate(ions):
+			if ion in ['D', 'Deuterium', 'deuterium', 'd']: 
+				foundIt = True
+				break
+		if not foundIt: 
+			idx = 0
+			ion = ions[idx]
+			print('Cannot find the Deuterium ion species.')
+		
+		print('Using the ion species: ' + ion)
+		ni = np.array(profiles['ion'][idx]['density'])
+		if np.any(ni <= 0): print('Problem: ni <= 0 somewhere')
+		Ti = np.array(profiles['ion'][idx]['temperature'])
+		if np.any(Ti <= 0): print('Problem: Ti <= 0 somewhere')
 		norm = [1e20, 1e3, 1e3]	# normalize n, T, p
 		if np.log10(Te[0]) < 2: norm[1] = 1		# already normalized
 		if np.log10(pth[0]) < 2: norm[2] = 1	# already normalized
@@ -334,6 +344,8 @@ class JSON_IMAS:
 			psum = ne*(Te + Ti)*e
 		else:
 			psum = ne*Te*e + ni*Ti*e
+		
+		rawData = {'psiN':psiN, 'pth':pth, 'ne':ne, 'Te':Te, 'ni':ni, 'Ti':Ti, 'psiNeqd':psieq, 'pres':peq, 'ion':ion, 'psum':psum}
 		
 		plt.figure()
 		plt.plot(psieq, peq*1e-3, 'k-', lw = 2, label = 'geqdsk')
@@ -344,67 +356,37 @@ class JSON_IMAS:
 		plt.xlim(0,1)
 		plt.legend()
 		
+		return rawData
 		
 
-	def interlacePressure(self, psiProf, pProf, psiEQD, pEQD):
-		"""
-		If the pressure profiles in EQD and Profiles have different knots, but 'visually' match, then interlace them to increase overall resolution
-		"""
-		if len(psiProf) == len(psiEQD):
-			if np.abs(psiProf - psiEQD).max() < 1e-6:
-				print('Pressure profile knots are identical, no interlacing possible')
-				return -1
-				
-		import matplotlib.pyplot as plt
-		fig = plt.figure()
-		plt.plot(psiProf, pProf*1e-3, 'ko-', lw = 2, label = 'Profiles pressure')
-		plt.plot(psiEQD, pEQD*1e-3, 'bo-', lw = 2, label = 'EQD pressure')
-		plt.xlim(0,1)
-		plt.xlabel('$\\psi$')
-		plt.ylabel('p$ [kPa]')
-		plt.legend()
-		
-		x = np.linspace(0,1,300)
-		fProf = scinter.PchipInterpolator(psiProf, pProf)
-		fEQD = scinter.PchipInterpolator(psiEQD, pEQD)
-		
-		if np.abs(fProf(x) - fEQD(x)).max() < 1e-6:	
-			print('Profiles similar. Attempting interlace')
-		else:
-			plt.plot(x, (fProf(x) - fEQD(x))*1e-3, 'r-', lw = 2, label = 'difference')
-			plt.legend()
-			print('Profiles appear different. Verify with plot if interlacing should be done.')
-			answer = input("Proceed (y/n)?: ")
-			if answer in ['n', 'no', 'No', 'N', 'False', 'false']:
-				plt.close(fig) 
-				return -1
-		
-		psiAll = np.append(psiProf,psiEQD)
-		psiOrder = np.argsort(psiAll)
-		psiAll = psiAll[psiOrder]
-		pAll = np.append(pProf,pEQD)[psiOrder]
-		d = np.abs(np.diff(psiAll))
-		idx = np.where(d < 1e-12)[0]
-		psiAll = np.delete(psiAll,idx)
-		pAll = np.delete(pAll,idx)
-		
-		plt.plot(psiAll, pAll*1e-3, 'g-', lw = 2, label = 'Combined pressure')
-		plt.legend()
-		self.profiles['psiPres'], self.profiles['p'] = psiAll, pAll
-		return 0
-		
-
-	def correct_ne(self, asymptote = 0, correctionMargin = None):
+	def correct_ne(self, asymptote = 0, correctionMargin = None, correctionMarginCore = None):
 		"""		
-		Correct ne, so that p - sum(n*T) >= 0 for all points in p = self.profiles['p']
+		Correct ne, so that p - sum(n*T) >= 0 for all points in p = self.data['equilibrium']['time_slice'][tIdx]['profiles_1d']['pressure']
 		This ignores the original ni profile and assumes ni = ne, as required in M3D-C1, also ignore any impurities
 		Then extrapolate ne using exponential decay and interpolate ne on extended psi grid
 		"""
+		tIdx = np.where(np.round(np.array(self.data['equilibrium']['time']),8) == self.time)[0][0]
+		eqt = self.data['equilibrium']['time_slice'][tIdx]
+		psi0 = np.array(eqt['profiles_1d']['psi_norm'])
+		p0 = np.array(eqt['profiles_1d']['pressure'])
+		if p0[-1] <= 0:
+			print('Problem: EFIT pressure <= 0 at separatrix. This is fatal. Aborting ne correction!')
+			return
+		
 		fne = scinter.UnivariateSpline(self.profiles['psi'],self.profiles['ne'],s = 0)	# remap ne if usePressureFromEQDSK, else this does nothing
-		ion = self.profiles['ions'][0]
-		psiEx, Te, Ti = self.profiles['extend']['psi'], self.profiles['extend']['Te'], self.profiles['extend'][ion]['Ti']
-		psi0, p0, ne = self.profiles['psiPres'], self.profiles['p'], fne(self.profiles['psiPres'])
-		neNew = expro.correct_ne(psi0, p0, ne, psiEx, Te, Ti, asymptote = asymptote, correctionMargin = correctionMargin)
+		
+		foundIt = False
+		for idx in range(len(self.profiles['ions'])):
+			ion = self.profiles['ions'][idx]
+			if ion in ['D', 'Deuterium', 'deuterium', 'd']: 
+				foundIt = True
+				break
+		if not foundIt: 
+			ion = self.profiles['ions'][0]
+			print('Cannot find the Deuterium ion species. Using the ion species: ' + ion)
+		
+		psiEx, ne, Te, Ti = self.profiles['extend']['psi'], fne(psi0), self.profiles['extend']['Te'], self.profiles['extend'][ion]['Ti']
+		neNew = expro.correct_ne(psi0, p0, ne, psiEx, Te, Ti, asymptote = asymptote, correctionMargin = correctionMargin, correctionMarginCore = correctionMarginCore)
 		self.profiles['extend']['ne'] = neNew
 		self.profiles['extend'][ion]['ni'] = self.profiles['extend']['ne'].copy()
 
@@ -413,7 +395,15 @@ class JSON_IMAS:
 		"""
 		Extend the pressure using sum(n*T) for psi > 1
 		"""
-		ion = self.profiles['ions'][0]
+		foundIt = False
+		for idx in range(len(self.profiles['ions'])):
+			ion = self.profiles['ions'][idx]
+			if ion in ['D', 'Deuterium', 'deuterium', 'd']: 
+				foundIt = True
+				break
+		if not foundIt: 
+			ion = self.profiles['ions'][0]
+			print('Cannot find the Deuterium ion species. Using the ion species: ' + ion)
 		psiEx, ne, Te = self.profiles['extend']['psi'], self.profiles['extend']['ne'], self.profiles['extend']['Te']
 		ni, Ti = self.profiles['extend'][ion]['ni'], self.profiles['extend'][ion]['Ti']
 		psi0, p0 = self.profiles['extend']['psi1'], self.profiles['extend']['p']	# here on psi1 grid only
@@ -426,7 +416,15 @@ class JSON_IMAS:
 		#Verify that p - sum(n*T) >= 0
 		#Using the extended psi grid and original grid
 		"""
-		ion = self.profiles['ions'][0]
+		foundIt = False
+		for idx in range(len(self.profiles['ions'])):
+			ion = self.profiles['ions'][idx]
+			if ion in ['D', 'Deuterium', 'deuterium', 'd']: 
+				foundIt = True
+				break
+		if not foundIt: 
+			ion = self.profiles['ions'][0]
+			print('Cannot find the Deuterium ion species. Using the ion species: ' + ion)
 		psiEx, ne, Te = self.profiles['extend']['psi'], self.profiles['extend']['ne'], self.profiles['extend']['Te']
 		ni, Ti, pEx = self.profiles['extend'][ion]['ni'], self.profiles['extend'][ion]['Ti'], self.profiles['extend']['p']
 		expro.checkExtension(psiEx, ne, Te, ni, Ti, pEx)
@@ -443,22 +441,30 @@ class JSON_IMAS:
 		# Spline ne,te and ti for the original psi
 		fne = scinter.UnivariateSpline(self.profiles['extend']['psi'], self.profiles['extend']['ne'], s = 0)
 		fte = scinter.UnivariateSpline(self.profiles['extend']['psi'], self.profiles['extend']['Te'], s = 0)
-		ion = self.profiles['ions'][0]
-		ion0 = self.profiles['ions'][0]
+		foundIt = False
+		for idx in range(len(self.profiles['ions'])):
+			ion = self.profiles['ions'][idx]
+			if ion in ['D', 'Deuterium', 'deuterium', 'd']: 
+				foundIt = True
+				break
+		if not foundIt: 
+			ion = self.profiles['ions'][0]
+			print('Cannot find the Deuterium ion species. Using the ion species: ' + ion)
+		#ion0 = self.profiles['ions'][0]
 		fti = scinter.UnivariateSpline(self.profiles['extend']['psi'], self.profiles['extend'][ion]['Ti'], s = 0)
-		if len(self.profiles['ions']) > 1:
-			y = 0
-			for i in range(1,len(self.profiles['ions'])): 
-				ion = self.profiles['ions'][i]
-				if 'Ti' in self.profiles['extend'][ion]:
-					y += self.profiles['extend'][ion]['ni'] * self.profiles['extend'][ion]['Ti']*e
-				else:
-					y += self.profiles['extend'][ion]['ni'] * self.profiles['extend'][ion0]['Ti']*e
-			fnT_imp = scinter.UnivariateSpline(self.profiles['extend']['psi'], y, s = 0)
-		else: fnT_imp = lambda x: 0
+		#if len(self.profiles['ions']) > 1:
+		#	y = 0
+		#	for i in range(1,len(self.profiles['ions'])): 
+		#		ion = self.profiles['ions'][i]
+		#		if 'Ti' in self.profiles['extend'][ion]:
+		#			y += self.profiles['extend'][ion]['ni'] * self.profiles['extend'][ion]['Ti']*e
+		#		else:
+		#			y += self.profiles['extend'][ion]['ni'] * self.profiles['extend'][ion0]['Ti']*e
+		#	fnT_imp = scinter.UnivariateSpline(self.profiles['extend']['psi'], y, s = 0)
+		#else: fnT_imp = lambda x: 0
+		fnT_imp = lambda x: 0
 		
 		# with original ni get d = p - sum(n*T), with original p, and extended/splined n & T (except ni)
-		ion = self.profiles['ions'][0]
 		x = self.profiles['psi']
 		netex, tix, impx = fne(x) * fte(x)*e, fti(x)*e, fnT_imp(x)
 		p = netex + self.profiles[ion]['ni'] * tix + impx 
@@ -690,6 +696,57 @@ class JSON_IMAS:
 			self._write_array(RHOVN, f)
 
 		print('Wrote new gfile')
+
+
+
+	def interlacePressure(self, psiProf, pProf, psiEQD, pEQD):
+		"""
+		If the pressure profiles in EQD and Profiles have different knots, but 'visually' match, then interlace them to increase overall resolution
+		This is not used anymore!
+		"""
+		if len(psiProf) == len(psiEQD):
+			if np.abs(psiProf - psiEQD).max() < 1e-6:
+				print('Pressure profile knots are identical, no interlacing possible')
+				return -1
+				
+		import matplotlib.pyplot as plt
+		fig = plt.figure()
+		plt.plot(psiProf, pProf*1e-3, 'ko-', lw = 2, label = 'Profiles pressure')
+		plt.plot(psiEQD, pEQD*1e-3, 'bo-', lw = 2, label = 'EQD pressure')
+		plt.xlim(0,1)
+		plt.xlabel('$\\psi$')
+		plt.ylabel('p$ [kPa]')
+		plt.legend()
+		
+		x = np.linspace(0,1,300)
+		fProf = scinter.PchipInterpolator(psiProf, pProf)
+		fEQD = scinter.PchipInterpolator(psiEQD, pEQD)
+		
+		if np.abs(fProf(x) - fEQD(x)).max() < 1e-6:	
+			print('Profiles similar. Attempting interlace')
+		else:
+			plt.plot(x, (fProf(x) - fEQD(x))*1e-3, 'r-', lw = 2, label = 'difference')
+			plt.legend()
+			print('Profiles appear different. Verify with plot if interlacing should be done.')
+			answer = input("Proceed (y/n)?: ")
+			if answer in ['n', 'no', 'No', 'N', 'False', 'false']:
+				plt.close(fig) 
+				return -1
+		
+		psiAll = np.append(psiProf,psiEQD)
+		psiOrder = np.argsort(psiAll)
+		psiAll = psiAll[psiOrder]
+		pAll = np.append(pProf,pEQD)[psiOrder]
+		d = np.abs(np.diff(psiAll))
+		idx = np.where(d < 1e-12)[0]
+		psiAll = np.delete(psiAll,idx)
+		pAll = np.delete(pAll,idx)
+		
+		plt.plot(psiAll, pAll*1e-3, 'g-', lw = 2, label = 'Combined pressure')
+		plt.legend()
+		self.profiles['psiPres'], self.profiles['p'] = psiAll, pAll
+		return 0
+		
 
 
 	#=====================================================================
