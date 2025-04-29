@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import minimize
 import scipy.interpolate as scinter
-from scipy.integrate import simps
+from scipy.integrate import simpson
 from scipy.optimize import curve_fit
 
 def residual(x, y, x0, y0):
@@ -254,7 +254,7 @@ def get_optimized_profiles(infile, n_p, n_c, n_i, lin = False, smin = 0, smax = 
 	y_p = f(x_p)
 	f = scinter.UnivariateSpline(nml['ac_aux_s'], nml['ac_aux_f'], s = 0)
 	y_c = f(x_c)
-	I = simps(f(np.linspace(0,1,300)))
+	I = simpson(f(np.linspace(0,1,300)))
 	f = scinter.UnivariateSpline(nml['ai_aux_s'], nml['ai_aux_f'], s = 0)
 	y_i = f(x_i)
 
@@ -283,7 +283,7 @@ def get_optimized_profiles(infile, n_p, n_c, n_i, lin = False, smin = 0, smax = 
 	plt.xlabel('s'); plt.ylabel('p [kPa]')
 	plt.figure()
 	f2 = scinter.UnivariateSpline(x_c, y_c, s = 0)
-	I2 = simps(f2(np.linspace(0,1,300)))
+	I2 = simpson(f2(np.linspace(0,1,300)))
 	plt.plot(nml['ac_aux_s'], f2(nml['ac_aux_s'])/1e+6,'r-', nml['ac_aux_s'], nml['ac_aux_f']/1e+6, 'k--', x_c, y_c/1e+6, 'rx')
 	plt.xlabel('s'); plt.ylabel('j$_{\\phi}$ [10$^6$ A/m$^2$]')
 	plt.figure()
