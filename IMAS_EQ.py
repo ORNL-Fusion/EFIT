@@ -98,6 +98,7 @@ class JSON_IMAS:
 		except:
 			psiN_orig = np.linspace(0,1,d['nw'])
 		psiN_reg = np.linspace(0,1,d['nw'])
+		d['psiN_orig'] = psiN_orig
 		d['fpol_orig'] = np.array(eqt['profiles_1d']['f'])
 		d['fpol'] = np.interp(psiN_reg, psiN_orig, d['fpol_orig']) * BtMult
 		d['ffprime_orig'] = np.array(eqt['profiles_1d']['f_df_dpsi'])
