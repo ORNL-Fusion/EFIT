@@ -285,7 +285,7 @@ class equilParams:
 		# Interpolation function handles for all 1-D fields in the g-file
 		def profiles(self, BtMult):
 			# ---- Profiles ----
-			fpol = self.data.get('fpol')
+			fpol = self.data.get('fpol') * BtMult
 			ffunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(fpol)), fpol, s=0)
 			fprime = self.data.get('ffprime')/fpol
 			fpfunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(fprime)), fprime, s=0)
