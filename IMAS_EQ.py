@@ -73,14 +73,14 @@ class JSON_IMAS:
 
 		d = {}
 		#ep object name left of '='
-		d['R1D'] = eqt['profiles_2d'][0]['grid']['dim1']
-		d['Z1D'] = eqt['profiles_2d'][0]['grid']['dim2']
+		d['R1D'] = np.array(eqt['profiles_2d'][0]['grid']['dim1'])
+		d['Z1D'] = np.array(eqt['profiles_2d'][0]['grid']['dim2'])
 		d['nw'] = len(d['R1D'])
 		d['nh'] = len(d['Z1D']) 
-		d['rcentr'] = self.data['equilibrium']['vacuum_toroidal_field']['r0']
-		d['bcentr'] = self.data['equilibrium']['vacuum_toroidal_field']['b0'][tIdx] * BtMult
-		d['rmaxis'] = eqt['global_quantities']['magnetic_axis']['r']
-		d['zmaxis'] = eqt['global_quantities']['magnetic_axis']['z']
+		d['rcentr'] = np.array(self.data['equilibrium']['vacuum_toroidal_field']['r0'])
+		d['bcentr'] = np.array(self.data['equilibrium']['vacuum_toroidal_field']['b0'][tIdx]) * BtMult
+		d['rmaxis'] = np.array(eqt['global_quantities']['magnetic_axis']['r'])
+		d['zmaxis'] = np.array(eqt['global_quantities']['magnetic_axis']['z'])
 		d['Rmin'] = np.min(eqt['profiles_2d'][0]['grid']['dim1'])
 		d['Rmax'] = np.max(eqt['profiles_2d'][0]['grid']['dim1'])
 		d['Rlcfs'] = np.array(eqt['boundary']['outline']['r'])
@@ -89,8 +89,8 @@ class JSON_IMAS:
 		d['Zmin'] = np.min(eqt['profiles_2d'][0]['grid']['dim2'])
 		d['Zmax'] = np.max(eqt['profiles_2d'][0]['grid']['dim2'])
 		d['Zlowest'] = np.min(d['Zlcfs'])
-		d['siAxis'] = eqt['global_quantities']['psi_axis'] * psiMult
-		d['siBry'] = eqt['global_quantities']['psi_boundary'] * psiMult
+		d['siAxis'] = np.array(eqt['global_quantities']['psi_axis']) * psiMult
+		d['siBry'] = np.array(eqt['global_quantities']['psi_boundary']) * psiMult
 
 		# 1D profiles (if they arent nw long, interpolate them to be nw long)
 		psiN = np.linspace(0,1,d['nw'])
