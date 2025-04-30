@@ -92,23 +92,22 @@ class JSON_IMAS:
 		d['siAxis'] = np.array(eqt['global_quantities']['psi_axis']) * psiMult
 		d['siBry'] = np.array(eqt['global_quantities']['psi_boundary']) * psiMult
 
-		# 1D profiles (if they arent nw long, interpolate them to be nw long)
-		psiN = np.linspace(0,1,d['nw'])
-		d['fpol'] = np.array(eqt['profiles_1d']['f'])
-		if len(d['fpol']) != d['R1D']:
-			d['fpol'] = np.interp(psiN, np.linspace(0,1,len(d['fpol'])), d['fpol']) * BtMult
-		d['ffprime'] = np.array(eqt['profiles_1d']['f_df_dpsi'])
-		if len(d['ffprime']) != d['R1D']:
-			d['ffprime'] = np.interp(psiN, np.linspace(0,1,len(d['ffprime'])), d['ffprime'])
-		d['pprime'] = np.array(eqt['profiles_1d']['dpressure_dpsi'])
-		if len(d['pprime']) != d['R1D']:
-			d['pprime'] = np.interp(psiN, np.linspace(0,1,len(d['pprime'])), d['pprime'])
-		d['pres'] = np.array(eqt['profiles_1d']['pressure'])
-		if len(d['pres']) != d['R1D']:
-			d['pres'] = np.interp(psiN, np.linspace(0,1,len(d['pres'])), d['pres'])
-		d['qpsi'] = np.array(eqt['profiles_1d']['q'])
-		if len(d['qpsi']) != d['R1D']:
-			d['qpsi'] = np.interp(psiN, np.linspace(0,1,len(d['qpsi'])), d['qpsi'])
+		# 1D profiles (interpolate so they are on regular grid)
+		try:
+			psiN_orig = np.array(eqt['profiles_1d']['psi_norm'])
+		except:
+			psiN_orig = np.linspace(0,1,d['nw'])
+		psiN_reg = np.linspace(0,1,d['nw'])
+		d['fpol_orig'] = np.array(eqt['profiles_1d']['f'])
+		d['fpol'] = np.interp(psiN_reg, psiN_orig, d['fpol_orig']) * BtMult
+		d['ffprime_orig'] = np.array(eqt['profiles_1d']['f_df_dpsi'])
+		d['ffprime'] = np.interp(psiN_reg, psiN_orig, d['ffprime_orig'])
+		d['pprime_orig'] = np.array(eqt['profiles_1d']['dpressure_dpsi'])
+		d['pprime'] = np.interp(psiN_reg, psiN_orig, d['pprime_orig'])
+		d['pres_orig'] = np.array(eqt['profiles_1d']['pressure'])
+		d['pres'] = np.interp(psiN_reg, psiN_orig, d['pres_orig'])
+		d['qpsi_orig'] = np.array(eqt['profiles_1d']['q'])
+		d['qpsi'] = np.interp(psiN_reg, psiN_orig, d['qpsi_orig'])
 
 		#2D profiles
 		d['psirz'] = np.array(eqt['profiles_2d'][0]['psi']).T * psiMult
@@ -128,7 +127,7 @@ class JSON_IMAS:
 		d['thetapnts'] = 2*d['nw']
 		d['Rsminor'] = np.linspace(d['rmaxis'], d['Rbdry'], d['nw'])
 		self.eqd = d
-		self.psiN = psiN
+		self.psiN = psiN_reg
 		return d
 	
 	
