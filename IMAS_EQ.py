@@ -83,19 +83,14 @@ class JSON_IMAS:
 
 		d = {}
 		#ep object name left of '='
-		d['R1D'] = eqt['profiles_2d'][0]['grid']['dim1']
-		d['Z1D'] = eqt['profiles_2d'][0]['grid']['dim2']
+		d['R1D'] = np.array(eqt['profiles_2d'][0]['grid']['dim1'])
+		d['Z1D'] = np.array(eqt['profiles_2d'][0]['grid']['dim2'])
 		d['nw'] = len(d['R1D'])
 		d['nh'] = len(d['Z1D']) 
-		try:
-			d['rcentr'] = self.data['equilibrium']['vacuum_toroidal_field']['r0']
-			d['bcentr'] = self.data['equilibrium']['vacuum_toroidal_field']['b0'][tIdx] * BtMult
-		except:
-			print('Vacuum Toroidal Filed data is missing. Using a full field default')
-			d['rcentr'] = 1.8495
-			d['bcentr'] = 12.20329818869965
-		d['rmaxis'] = eqt['global_quantities']['magnetic_axis']['r']
-		d['zmaxis'] = eqt['global_quantities']['magnetic_axis']['z']
+		d['rcentr'] = np.array(self.data['equilibrium']['vacuum_toroidal_field']['r0'])
+		d['bcentr'] = np.array(self.data['equilibrium']['vacuum_toroidal_field']['b0'][tIdx]) * BtMult
+		d['rmaxis'] = np.array(eqt['global_quantities']['magnetic_axis']['r'])
+		d['zmaxis'] = np.array(eqt['global_quantities']['magnetic_axis']['z'])
 		d['Rmin'] = np.min(eqt['profiles_2d'][0]['grid']['dim1'])
 		d['Rmax'] = np.max(eqt['profiles_2d'][0]['grid']['dim1'])
 		d['Rlcfs'] = np.array(eqt['boundary']['outline']['r'])
@@ -104,38 +99,27 @@ class JSON_IMAS:
 		d['Zmin'] = np.min(eqt['profiles_2d'][0]['grid']['dim2'])
 		d['Zmax'] = np.max(eqt['profiles_2d'][0]['grid']['dim2'])
 		d['Zlowest'] = np.min(d['Zlcfs'])
-		d['siAxis'] = eqt['global_quantities']['psi_axis'] * psiMult
-		d['siBry'] = eqt['global_quantities']['psi_boundary'] * psiMult
+		d['siAxis'] = np.array(eqt['global_quantities']['psi_axis']) * psiMult
+		d['siBry'] = np.array(eqt['global_quantities']['psi_boundary']) * psiMult
 
-		# 1D profiles (if they arent nw long, interpolate them to be nw long)
-		psiN = np.linspace(0,1,d['nw'])		# EFIT g-file standard assumes an equidistant psi with length nw
-		psiN_profile = np.array(eqt['profiles_1d']['psi_norm'])	# This is the psi used for all 1D profiles. This can be different from psiN, typically for MEQ
-		if psiN_profile[-1] != 1.0: 
-			print('WARNING: psiN grid is not correctly normalized! Renormalizing...')
-			psiAxis = psiN_profile[0]
-			psiSep = psiN_profile[-1]
-			psiN_profile = (psiN_profile - psiAxis)/(psiSep - psiAxis)	
-		
-		lenPsiN = len(psiN_profile)
-		isMEQ = False
-		if (lenPsiN != d['nw']) or ((psiN_profile[-1] - psiN_profile[-2]) != (psiN[-1] - psiN[-2])):	# true: not the same length or not the same grid size
-			isMEQ = True
-		
-		d['fpol'] = np.array(eqt['profiles_1d']['f']) * BtMult
-		d['ffprime'] = np.array(eqt['profiles_1d']['f_df_dpsi'])
-		d['pprime'] = np.array(eqt['profiles_1d']['dpressure_dpsi'])
-		d['pres'] = np.array(eqt['profiles_1d']['pressure'])
-		d['qpsi'] = np.array(eqt['profiles_1d']['q'])
-		if isMEQ: 
-			d['fpol'] = np.interp(psiN, psiN_profile, d['fpol'])
-			d['ffprime'] = np.interp(psiN, psiN_profile, d['ffprime'])
-			d['pprime'] = np.interp(psiN, psiN_profile, d['pprime'])
-			d['pres'] = np.interp(psiN, psiN_profile, d['pres'])
-			d['qpsi'] = np.interp(psiN, psiN_profile, d['qpsi'])
-			
-		if d['pres'][-1] <= 0: 
-			print('Problem: EFIT pressure at Separatrix is <= 0. This makes this EFIT unusable for M3DC1')
-		
+		# 1D profiles (interpolate so they are on regular grid)
+		try:
+			psiN_orig = np.array(eqt['profiles_1d']['psi_norm'])
+		except:
+			psiN_orig = np.linspace(0,1,d['nw'])
+		psiN_reg = np.linspace(0,1,d['nw'])
+		d['psiN_orig'] = psiN_orig
+		d['fpol_orig'] = np.array(eqt['profiles_1d']['f'])
+		d['fpol'] = np.interp(psiN_reg, psiN_orig, d['fpol_orig']) * BtMult
+		d['ffprime_orig'] = np.array(eqt['profiles_1d']['f_df_dpsi'])
+		d['ffprime'] = np.interp(psiN_reg, psiN_orig, d['ffprime_orig'])
+		d['pprime_orig'] = np.array(eqt['profiles_1d']['dpressure_dpsi'])
+		d['pprime'] = np.interp(psiN_reg, psiN_orig, d['pprime_orig'])
+		d['pres_orig'] = np.array(eqt['profiles_1d']['pressure'])
+		d['pres'] = np.interp(psiN_reg, psiN_orig, d['pres_orig'])
+		d['qpsi_orig'] = np.array(eqt['profiles_1d']['q'])
+		d['qpsi'] = np.interp(psiN_reg, psiN_orig, d['qpsi_orig'])
+
 		#2D profiles
 		d['psirz'] = np.array(eqt['profiles_2d'][0]['psi']).T * psiMult
 		if d['psirz'].shape[0] != d['nh']: d['psirz'] = d['psirz'].T
@@ -157,7 +141,7 @@ class JSON_IMAS:
 		d['thetapnts'] = 2*d['nw']
 		d['Rsminor'] = np.linspace(d['rmaxis'], d['Rbdry'], d['nw'])
 		self.eqd = d
-		self.psiN = psiN
+		self.psiN = psiN_reg
 		return d
 	
 	

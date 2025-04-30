@@ -17,12 +17,14 @@ import warnings
 from . import geqdsk as gdsk	# this is a relative import
 from . import equilibrium as eq
 
-try: from . import IMAS_EQ	# this is a relative import
-except: pass	# if not found skip this import; then only geqdsk functionality available
+try: 
+	from . import IMAS_EQ	# this is a relative import
+except Exception as e:
+	print(e)	# if not found skip this import; then only geqdsk functionality available
 
 class equilParams:
 
-		def __init__(self, filename, EQmode='geqdsk', 
+		def __init__(self, filename, EQmode=None, 
 					 nw=0, nh=0, thetapnts=0, grid2G=True,
 					 tree=None, server='atlas.gat.com', time=10.4,
 					 psiMult=1.0, BtMult=1.0, IpMult=1.0):
@@ -50,7 +52,17 @@ class equilParams:
 
 			#read GEQDSKs text file or IMAS formatted file (netCDF, HDF5, JSON)
 			GEQDSKflag = False
-			if ('.json' in filename[-5::]) or ('.JSON' in filename[-5::]): EQmode = 'json'
+
+			#if EQmode was not provided, determine
+			if EQmode==None:
+				extension = os.path.splitext(filename)[1]
+				if extension == '.nc':
+					EQmode = 'netcdf'
+				elif extension == '.json':
+					EQmode = 'json'
+				else:
+					EQmode = 'geqdsk'
+
 			if EQmode == 'netcdf':
 				print("NetCDF EQmode")
 				imas_nc = IMAS_EQ.netCDF_IMAS()
@@ -274,7 +286,7 @@ class equilParams:
 		# Interpolation function handles for all 1-D fields in the g-file
 		def profiles(self, BtMult):
 			# ---- Profiles ----
-			fpol = self.data.get('fpol')
+			fpol = self.data.get('fpol') * BtMult
 			ffunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(fpol)), fpol, s=0)
 			fprime = self.data.get('ffprime')/fpol
 			fpfunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(fprime)), fprime, s=0)
