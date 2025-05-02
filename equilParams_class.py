@@ -69,8 +69,12 @@ class equilParams:
 				self.data = imas_nc.readNetCDF(filename, time)
 			elif EQmode == 'json':
 				print("JSON EQmode")
-				imas_js = IMAS_EQ.JSON_IMAS(filename)
-				self.data = imas_js.getEQ(time)
+				try:
+					imas_js = IMAS_EQ.JSON_IMAS(filename)
+					self.data = imas_js.getEQ(time)
+				except Exception as e:
+					print("Could not load JSON EQ.  Error:")
+					print(e)
 			else:
 				#print("GEQDSK EQmode")
 				GEQDSKflag = True
@@ -139,7 +143,7 @@ class equilParams:
 					  'Nlcfs': len(self.lcfs), 'Nwall': len(self.wall),
 					  'lcfs': self.lcfs, 'wall':self.wall, 
 					  'psi': self.PSIdict['psi1D'], 'psiN': self.PSIdict['psiN1D'],'Rsminor': self.Rsminor,
-					  'kappa': shape['kappa'], 'triUP': shape['triUP'][0], 'triLO': shape['triLO'][0], 
+					  'kappa': shape['kappa'], 'triUP': shape['triUP'], 'triLO': shape['triLO'], 
 					  'aminor': shape['aminor'], 'aspect': shape['aspect']}
 					  
 			self.Swall, self.Swall_max = self.length_along_wall()
@@ -373,8 +377,8 @@ class equilParams:
 			b = (FluxSur['Zs'].max()-FluxSur['Zs'].min())/2
 			a = (FluxSur['Rs'].max()-FluxSur['Rs'].min())/2
 			R = (FluxSur['Rs'].max()+FluxSur['Rs'].min())/2
-			d = (FluxSur['Rs'].min()+a) - FluxSur['Rs'][np.where(FluxSur['Zs'] == FluxSur['Zs'].max())]
-			c = (FluxSur['Rs'].min()+a) - FluxSur['Rs'][np.where(FluxSur['Zs'] == FluxSur['Zs'].min())]
+			d = (FluxSur['Rs'].min()+a) - FluxSur['Rs'][np.where(FluxSur['Zs'] == FluxSur['Zs'].max())[0]]
+			c = (FluxSur['Rs'].min()+a) - FluxSur['Rs'][np.where(FluxSur['Zs'] == FluxSur['Zs'].min())[0]]
 
 			return {'kappa': (b/a), 'tri_avg': (c+d)/2/a, 'triUP': (d/a), 'triLO': (c/a), 'aminor': a, 'aspect': R/a, 'radius': R}
 
