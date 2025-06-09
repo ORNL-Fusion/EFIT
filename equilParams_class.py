@@ -262,8 +262,8 @@ class equilParams:
 				f.write('3 ' + str(self.g['NR']) + ' ' + str(self.g['NZ']) + '\n')
 				f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.g['Xdim'], self.g['Zdim'], self.g['R0'], self.g['R1'], self.g['Zmid']))
 				f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.g['RmAxis'], self.g['ZmAxis'], self.g['psiAxis'], self.g['psiSep'], self.g['Bt0']))
-				f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.g['Ip'], 0, 0, 0, 0))
-				f.write('% .9E% .9E% .9E% .9E% .9E\n'%(0,0,0,0,0))
+				f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.g['Ip'], self.g['psiAxis'], 0, self.g['RmAxis'], 0))
+				f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.g['ZmAxis'],0,self.g['psiSep'],0,0))
 				self._write_array(self.g['Fpol'], f)
 				self._write_array(self.g['Pres'], f)
 				self._write_array(self.g['FFprime'], f)
@@ -1297,7 +1297,7 @@ class equilParams:
 			
 		
 		 # --------------------------------------------------------------------------------
-		def helicity(self):
+		def helicity(self, verify = False):
 			"""
 			Calculate helicity from psiRZ and Fpol
 			verify with Bt and Ip signs
@@ -1316,6 +1316,22 @@ class equilParams:
 					print('Flip sign of Bt in g-file')
 				else:
 					print('Flip sign of Ip in g-file')
+					
+			if verify:
+				print('Bt = ',format(self.g['Bt0'],'.2f'))
+				print('Ip = ',format(self.g['Ip'],'.2f'))
+				import matplotlib.pyplot as plt
+				nR0 = abs(self.g['R'] - self.g['RmAxis']).argmin()
+				plt.figure()
+				plt.plot(self.g['R'][nR0:nR], self.dpsidR[nZ,nR0:nR],'k-',lw = 2, label = 'psiRZ along outer midplane')
+				plt.xlabel('R [m]')
+				plt.ylabel('$\\psi$')
+				plt.legend()
+				
+				plt.figure()
+				plt.plot(self.g['psiN'],self.g['Fpol'],'k-',lw = 2)
+				plt.xlabel('$\\psi$')
+				plt.ylabel('Fpol')
 			
 			return int(isHelicity)
 		
