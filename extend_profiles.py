@@ -6,7 +6,7 @@ import EFIT.optimize_profiles as op
 
 def make_profile(x, y, key, asymptote = None, save = False, show = True, 
 				xmin = 0, xmax = 1.2, dx = 0.005, xout = None, preservePoints = True,
-				matchpoint = None, dxfit = None, SOLdxfit = None):
+				matchpoint = None, dxfit = None, SOLdxfit = None, type = 'tanhfix'):
 	"""
 	Take profile data x,y, extend it to psi = xmax using a tanh with given asymptotic value
 	Optional save and plot 
@@ -25,9 +25,13 @@ def make_profile(x, y, key, asymptote = None, save = False, show = True,
 	  matchpoint = psi where x < xmin spline and x > xmin fit are matched together. This can be different than xmin, default is xmin
 	  dxfit = number of grid points on the left and right of matchpoint to ignore, so that the match can be made smoother with splines, typically single digit
 	  SOLdxfit = extra number of grid points to ignore on top of dxfit on the psi > matchpoint side; typically 0
+	  type = type of fit, default is tanhfix, other options are: exp. Using exp will set xmin = 0
 	Return:
 	  psi, pro
 	"""
+	if type == 'exp':	# this ignores matchpoint, dxfit and SOLdxfit
+		xmin = 0
+		
 	if x.min() > 0:
 		x1, y1 = x[0],y[0]
 		x2, y2 = x[1],y[1]
@@ -100,7 +104,7 @@ def make_profile(x, y, key, asymptote = None, save = False, show = True,
 		idx = x > xmin
 		x0 = x[idx]
 		y0 = y[idx]
-		psi0,pro0,_ = fit_profile(x0, y0, asymptote, xlim = [xmin,xmax], dx = dx)
+		psi0,pro0,_ = fit_profile(x0, y0, asymptote, xlim = [xmin,xmax], dx = dx, type = type)
 		
 		# attach the original profile for x < xmin with the fitted profile for x > xmin
 		idx1 = np.abs(x - matchpoint).argmin()
@@ -112,8 +116,8 @@ def make_profile(x, y, key, asymptote = None, save = False, show = True,
 		# uses the points xout if given, or a equidistant grid with dx otherwise
 		f = scinter.UnivariateSpline(x1, y1, s = 0)
 		pro = f(psi)
-	else:	# fit the entire profile, This is usually not a good idea, as the core and edge won't both fit well with the same tanh; this will ignore xout
-		psi0,pro0,_ = fit_profile(x, y, asymptote, xlim = [0,xmax], dx = dx)
+	else:	# fit the entire profile, This is recommended only for type=exp, but not a good idea for other types, as the core and edge won't both fit well with the same tanh
+		psi0,pro0,_ = fit_profile(x, y, asymptote, xlim = [0,xmax], dx = dx, type = type)
 		f = scinter.UnivariateSpline(psi0,pro0, s = 0)
 		pro = f(psi)
 		
@@ -129,17 +133,18 @@ def make_profile(x, y, key, asymptote = None, save = False, show = True,
 	return psi, pro
 
 
-def fit_profile(xin, y, asymptote, xlim = None, truncate = None, dx = 0.005):
+def fit_profile(xin, y, asymptote, xlim = None, truncate = None, dx = 0.005, type = 'tanhfix'):
 	"""
-	Calls op.fit_profile(...), but for type = tanhfix only
+	Calls op.fit_profile(...), but for type = tanhfix, or exp only
 	tanhfix is a tanh with a linear slope on the left, a fixed monotonic asymptote on the right 
 	fit values in popt are: 	SYMMETRY POINT, FULL WIDTH, HEIGHT, SLOPE INNER
+	exp is a simple exponential decay f(x) = a*exp(b*x) + c; c = asymptote is given as input
 	"""
 	if xlim is None: points = int((xin.max() - xin.min())/dx) + 1
 	else: points = int((xlim[1] - xlim[0])/dx) + 1
 
 	# fit profile
-	x1,y1,popt = op.fit_profile(xin, y, type = 'tanhfix', xlim = xlim, truncate = truncate, points = points, asymptote = asymptote)
+	x1,y1,popt = op.fit_profile(xin, y, type = type, xlim = xlim, truncate = truncate, points = points, asymptote = asymptote)
 	#print(popt)
 	return x1,y1,popt
 	

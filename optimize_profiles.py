@@ -134,6 +134,27 @@ def fit_profile(xin,y, N = None, type = 'spline', param = None, xlim = None, tru
 		y1 = tanh_flatout(x1, popt[0],popt[1],popt[2],asymptote,popt[3],popt[4],popt[5])
 		return x1,y1,popt
 		
+	elif type == 'exp':		
+		# This uses a simple exponential decay with the derivative at the last point of xin to match slopes and a fixes asymptote
+		x0 = xin[-1]					# this should be  = 1
+		y0 = y[-1]
+		dx = xin[-1] - xin[-2]			# NOT equidistant
+		dy = (-y[-2] + y[-1])/dx		# 1st order only due to non-equidistant grid
+		
+		if dy >= 0: 
+			print('Exponential extension failed: ',x0,y0,dx,dy)
+		
+		# Fit exponential decay f(x) = a*exp(b*x) + c; c = asymptote is given as input
+		c = asymptote
+		b = dy/(y0 - c)
+		a = dy/b * np.exp(-b*x0)	
+		fexp = lambda x: a*np.exp(b*x) + c
+		
+		idx = np.where(x1 > x0)[0]
+		y1 = np.append(y, fexp(x1[idx]))
+		x1 = np.append(xin, x1[idx])
+		return x1,y1,[a,b,c]
+		
 	else:
 		x = xin - xin[0]
 		norm = x[-1]

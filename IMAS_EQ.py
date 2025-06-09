@@ -181,7 +181,7 @@ class JSON_IMAS:
 	  	nsol = asymptotic value of SOL density for psi -> inf
 	  	Tsol = asymptotic value of SOL temperature for psi -> inf
 	  	preservePoints = Keep original psi grid points, otherwise replace with a linspace, default is True
-	  	extendForM3DC1 = Assume ni = ne, adjust Te instead of ni and set preservePoints = False
+	  	extendForM3DC1 = Assume ni = ne, adjust Te instead of ni and set preservePoints = False, use type = exp
 	  	correctionMargin = value < 1, but close to 1, default is 0.99, to multiply sum(n*T) so that sum(n*T) < p even for interpolated values.
 	  	correctionMarginCore: same as above, but for the core. If this is used, a tanh transitions smoothly from this in the core to the one above in the edge
 	  	usePressureFromEQDSK = Use pressure profile from the actual geqdsk in self.eqd instead of the pressure profile in data['core_profiles']
@@ -228,16 +228,22 @@ class JSON_IMAS:
 				if np.log10(self.profiles[ion]['Ti'][0]) < 2: self.profiles[ion]['Ti'] *= 1e3		# Ti was in keV, now in eV
 
 		if doNotExtend: return
-				
-		# Interpolate profiles to resolution dx, and extrapolate n,T profiles to psi = xmax
-		if extendForM3DC1: preservePoints = False
-		else: usePressureFromEQDSK = False
+		
+		### Interpolate profiles to resolution dx, and extrapolate n,T profiles to psi = xmax
+		if extendForM3DC1: 
+			preservePoints = False
+			type = 'exp'
+		else: 
+			usePressureFromEQDSK = False
+			type = 'tanhfix'	# this is also the default, if type is not given
 		self.profiles['extend'] = {}
-		asymptote = [nsol,Tsol]	# this is already normalized
 		norm = [1e20, 1e3, 1e3]	# normalize before profile fitting
+		if nsol is None: nsol = 0.5*self.profiles['ne'][-1]/norm[0]
+		if Tsol is None: Tsol = 0.5*self.profiles['Te'][-1]/norm[1]
+		asymptote = [nsol,Tsol]	# this is already normalized
 		
 		for i,key in enumerate(['ne','Te']):
-			x,y = expro.make_profile(self.profiles['psi'], self.profiles[key]/norm[i], key, asymptote = asymptote[i], show = False, xmin = xmin, xmax = xmax, dx = dx, preservePoints = preservePoints) 
+			x,y = expro.make_profile(self.profiles['psi'], self.profiles[key]/norm[i], key, asymptote = asymptote[i], show = False, xmin = xmin, xmax = xmax, dx = dx, preservePoints = preservePoints, type = type) 
 			self.profiles['extend'][key] = y*norm[i]
 		self.profiles['extend']['psi'] = x
 				
@@ -254,10 +260,10 @@ class JSON_IMAS:
 			self.profiles['extend'][ion] = {}
 			for i,key in enumerate(['ni','Ti']):
 				if key in self.profiles[ion]:
-					try: x,y = expro.make_profile(self.profiles['psi'], self.profiles[ion][key]/norm[i], key, asymptote = asymptote[i], show = False, xmin = xmin, xmax = xmax, dx = dx, preservePoints = preservePoints)
+					try: x,y = expro.make_profile(self.profiles['psi'], self.profiles[ion][key]/norm[i], key, asymptote = asymptote[i], show = False, xmin = xmin, xmax = xmax, dx = dx, preservePoints = preservePoints, type = type)
 					except: 
 						y = np.zeros(self.profiles['extend']['psi'].shape)
-						print('Extension failed for profile ' + key + 'for ion species: ' + ion)
+						print('Extension failed for profile ' + key + ' for ion species: ' + ion)
 					self.profiles['extend'][ion][key] = y*norm[i]
 						
 		# pressure needs special consideration: 
