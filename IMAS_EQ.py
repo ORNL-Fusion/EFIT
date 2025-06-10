@@ -645,8 +645,13 @@ class JSON_IMAS:
 
 		print('Writing to path: ' +file)
 		with open(file, 'w') as f:
-			f.write("{:<51}".format('  EFIT  xx/xx/xxxx  #' + str(shot) + '  ' + str(time) + 'ms'))	# this needs to be exactly 51 chars
-			f.write('3 ' + str(self.eqd['nw']) + ' ' + str(self.eqd['nh']) + '\n')
+			# Char counting of line: "         10        20        30        40        50        60
+			# Char counting of line: "123456789012345678901234567890123456789012345678901234567890
+			# example of first line: "  EFITD    03/13/2012    #148712  4101ms           3 129 129"
+			# From Fortran: 2000 format (6a8,3i4)
+			# From Fortran: write (negdsk,2000) (case(i),i=1,6),idum,mw,mh
+			f.write("{:<48}".format('  EFITD    xx/xx/xxxx    #' + str(shot).zfill(6) + '  ' + str(int(time))))	# this needs to be exactly 48 chars
+			f.write(str(3).rjust(4,' ') + str(self.eqd['nw']).rjust(4,' ') + str(self.eqd['nh']).rjust(4,' ') + '\n')			# each of the numbers needs to have 4 chars, padded with blanks
 			f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.eqd['rdim'], self.eqd['zdim'], self.eqd['rcentr'], self.eqd['Rmin'], self.eqd['Zmid']))
 			f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.eqd['rmaxis'], self.eqd['zmaxis'], self.eqd['siAxis'], self.eqd['siBry'], self.eqd['bcentr']))
 			f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.eqd['Ip'], self.eqd['siAxis'], 0, self.eqd['rmaxis'], 0))

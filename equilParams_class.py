@@ -258,8 +258,13 @@ class equilParams:
 	
 			print('Writing to path: ' + file)
 			with open(file, 'w') as f:
-				f.write("{:<51}".format('  EFIT  xx/xx/xxxx  #' + str(shot) + '  ' + str(self.g['time']) + 'ms'))	# this needs to be exactly 51 chars
-				f.write('3 ' + str(self.g['NR']) + ' ' + str(self.g['NZ']) + '\n')
+				# Char counting of line: "         10        20        30        40        50        60
+				# Char counting of line: "123456789012345678901234567890123456789012345678901234567890
+				# example of first line: "  EFITD    03/13/2012    #148712  4101ms           3 129 129"
+				# From Fortran: 2000 format (6a8,3i4)
+				# From Fortran: write (negdsk,2000) (case(i),i=1,6),idum,mw,mh
+				f.write("{:<48}".format('  EFITD    xx/xx/xxxx    #' + str(shot).zfill(6) + '  ' + str(int(self.g['time']))))	# this needs to be exactly 48 chars
+				f.write(str(3).rjust(4,' ') + str(self.g['NR']).rjust(4,' ') + str(self.g['NZ']).rjust(4,' ') + '\n')			# each of the numbers needs to have 4 chars, padded with blanks
 				f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.g['Xdim'], self.g['Zdim'], self.g['R0'], self.g['R1'], self.g['Zmid']))
 				f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.g['RmAxis'], self.g['ZmAxis'], self.g['psiAxis'], self.g['psiSep'], self.g['Bt0']))
 				f.write('% .9E% .9E% .9E% .9E% .9E\n'%(self.g['Ip'], self.g['psiAxis'], 0, self.g['RmAxis'], 0))
