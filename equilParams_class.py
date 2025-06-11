@@ -5,8 +5,8 @@ First Implemented: Sep. 10. 2012
 Please report bugs to: wingen@fusion.gat.com
 Python 3 version
 """
-_VERSION = 5.2
-_LAST_UPDATE = 'Feb 03. 2025'
+_VERSION = 5.3
+_LAST_UPDATE = 'June 10. 2025'
 
 import os
 import numpy as np
