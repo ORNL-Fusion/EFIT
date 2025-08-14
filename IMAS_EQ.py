@@ -359,7 +359,34 @@ class JSON_IMAS:
 		
 		if returnData: return rawData
 		else: return
+
+
+	def coilCurrents(self, writeCurrents = True):
+		"""		
+		Reads the coil currents from the JSON, multiplies with turns and writes the current.dat file for M3D-C1
+		"""
+		coils = ['CS1U','CS1L','CS2U','CS2L','CS3U','CS3L',
+				 'PF1U','PF1L','PF2U','PF2L','PF3U','PF3L','PF4U','PF4L',
+				 'DIV1U','DIV1L','DIV2U','DIV2L',
+				 'VSU','VSL']
+		turns = [375,375,170,170,170,170,
+				 100,100,140,140,96,96,120,120,
+				 24,24,24,24,
+				 8,8]
+		cur = [item['reconstructed'] for item in self.data['equilibrium']['time_slice'][0]['constraints']['pf_current']]	# in A
+		cur += [0.0] * (len(coils) - len(cur))
 		
+		# currents in kA * turns
+		cur,turns = np.array(cur),np.array(turns)
+		currents = cur * turns / 1000.0		# now in kAt
+		
+		if writeCurrents:
+			with open('current.dat', 'w') as f:
+				for i in range(len(currents)):
+					f.write(str(currents[i]) + '\n')
+					
+		return currents
+  
 
 	def correct_ne(self, asymptote = 0, correctionMargin = None, correctionMarginCore = None):
 		"""		
