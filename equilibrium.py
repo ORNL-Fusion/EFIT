@@ -55,13 +55,13 @@ except:
             return interp(x, self._xp, self._yp)
 
 try:
-    from scipy.integrate import simps
+    from scipy.integrate import simpson
 
     def integrate(f, a, b, n=301):
         x = np.linspace(a, b, n)
         delx = (b-a)/len(x)
         y = f(x)
-        return simps(y, dx=delx)
+        return simpson(y, dx=delx)
 except ImportError:
     print('integrate import failed, use self-defined method')
     # Define simple integrate function
