@@ -742,7 +742,9 @@ class equilParams:
 			
 			plt.plot(self.rmaxis, self.zmaxis, c+'x', markersize = 5, linewidth = 2)
 			cs1 = plt.contour(Rs, Zs, self.PSIdict['psiN_2D'], levs, colors = c)
-			cs1.collections[0].set_label('EFIT')
+			try: cs1.collections[0].set_label('EFIT')
+			except: 
+				pass			
 			plt.plot(self.g['lcfs'][:,0],self.g['lcfs'][:,1], c, lw = 2, label = 'EFIT Bndy')
 			
 			if fig is None:
