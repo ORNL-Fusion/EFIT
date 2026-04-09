@@ -593,6 +593,10 @@ class equilParams:
 		# --------------------------------------------------------------------------------
 		# Flux surface enclosed 2D-Volume (Area inside surface) and derivative (psi)
 		def volume2D(self, FluxSurfList = None):
+			try: from scipy.integrate import trapz,simps
+			except: 
+				from scipy.integrate import trapezoid as trapz
+				from scipy.integrate import simpson as simps
 			V = np.zeros(self.nw)
 			psi = self.PSIdict['psiN1D']
 
@@ -601,8 +605,8 @@ class equilParams:
 
 			for i in range(1, self.nw):
 				rsq = (FluxSurfList[i]['Rs'] - self.rmaxis)**2 + (FluxSurfList[i]['Zs'] - self.zmaxis)**2
-				try: V[i] = 0.5 * integ.simps(rsq, self.theta)
-				except: V[i] = 0.5 * integ.trapz(rsq, self.theta)
+				try: V[i] = 0.5 * simps(rsq, self.theta)
+				except: V[i] = 0.5 * trapz(rsq, self.theta)
 
 			# dV/dpsi
 			dV = np.zeros(self.nw)
@@ -779,7 +783,8 @@ class equilParams:
 				ylabel = "j$_{tor}$ [MA/m$^2$]"
 				y = self.jtor_profile()
 			elif what in ['I','Ip','current']:
-				from scipy.integrate import cumtrapz
+				try: from scipy.integrate import cumtrapz
+				except: from scipy.integrate import cumulative_trapezoid as cumtrapz
 				ylabel = "I [MA]"
 				FluxSurfList = self.get_allFluxSur()
 				jtor = self.jtor_profile(FluxSurfList)
