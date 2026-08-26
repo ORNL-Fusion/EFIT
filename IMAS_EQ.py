@@ -92,7 +92,7 @@ class JSON_IMAS:
 			tIdx = np.where(np.round(np.array(self.data['equilibrium']['time']),8) == time)[0][0]
 		except:
 			print("Could not find timestep " + str(time) + " in JSON equilibrium dict.	Aborting.")
-			self.listTimeSLices()
+			self.listTimeSlices()
 			return
 
 		eqt = self.data['equilibrium']['time_slice'][tIdx]
