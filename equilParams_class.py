@@ -26,7 +26,7 @@ class equilParams:
 
 		def __init__(self, filename, EQmode=None, 
 					 nw=0, nh=0, thetapnts=0, grid2G=True,
-					 tree=None, server='atlas.gat.com', time=10.4,
+					 tree=None, server='atlas.gat.com', time=0,
 					 psiMult=1.0, BtMult=1.0, IpMult=1.0):
 			"""
 			Open EQ file, read it, and provide dictionary self.g as well as 1D and 2D interpolation functions.
@@ -96,7 +96,7 @@ class equilParams:
 			self.Ip *= IpMult
 
 			# ---- default Functions ----
-			self.PROFdict = self.profiles(BtMult)
+			self.PROFdict = self.profiles(BtMult,psiMult)
 			self.RZdict = self.RZ_params()
 			self.PSIdict = self.getPsi(psiMult)
 			self.PHIdict = self.getTorPsi()
@@ -295,15 +295,15 @@ class equilParams:
 		  
 		# --------------------------------------------------------------------------------
 		# Interpolation function handles for all 1-D fields in the g-file
-		def profiles(self, BtMult):
+		def profiles(self, BtMult, psiMult):
 			# ---- Profiles ----
 			fpol = self.data.get('fpol') * BtMult
 			ffunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(fpol)), fpol, s=0)
-			fprime = self.data.get('ffprime')/fpol
+			fprime = self.data.get('ffprime')/fpol/psiMult
 			fpfunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(fprime)), fprime, s=0)
-			ffprime = self.data.get('ffprime')
+			ffprime = self.data.get('ffprime')/psiMult
 			ffpfunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(ffprime)), ffprime, s=0)
-			pprime = self.data.get('pprime')
+			pprime = self.data.get('pprime')/psiMult
 			ppfunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(pprime)), pprime, s=0)
 			pres = self.data.get('pres')
 			pfunc = interp.UnivariateSpline(np.linspace(0., 1., np.size(pres)), pres, s=0)
